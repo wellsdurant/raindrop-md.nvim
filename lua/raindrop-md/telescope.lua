@@ -50,8 +50,9 @@ local function make_display(bookmark)
     },
   })
 
-  -- Get excerpt or use empty string
+  -- Get excerpt and clean it (remove newlines, limit length)
   local excerpt = bookmark.excerpt or ""
+  excerpt = excerpt:gsub("[\r\n]+", " "):gsub("%s+", " ")
 
   return displayer({
     { bookmark.title, "TelescopeResultsIdentifier" },
@@ -113,12 +114,15 @@ function M.pick_bookmark(opts)
         finder = finders.new_table({
           results = bookmarks,
           entry_maker = function(entry)
+            -- Clean excerpt for ordinal (remove newlines)
+            local excerpt_clean = (entry.excerpt or ""):gsub("[\r\n]+", " "):gsub("%s+", " ")
+
             return {
               value = entry,
               display = function(e)
                 return make_display(e.value)
               end,
-              ordinal = entry.title .. " " .. entry.url .. " " .. (entry.excerpt or ""),
+              ordinal = entry.title .. " " .. entry.url .. " " .. excerpt_clean,
             }
           end,
         }),
