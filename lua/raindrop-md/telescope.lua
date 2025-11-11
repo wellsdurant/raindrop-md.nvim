@@ -91,6 +91,13 @@ function M.pick_bookmark(opts)
       return
     end
 
+    -- Sort bookmarks by modification time (newest first)
+    table.sort(bookmarks, function(a, b)
+      local a_time = a.lastUpdate or a.created or ""
+      local b_time = b.lastUpdate or b.created or ""
+      return a_time > b_time
+    end)
+
     local telescope_opts = vim.tbl_deep_extend("force", config.get("telescope_opts"), opts)
     local base_title = telescope_opts.prompt_title
 
