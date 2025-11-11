@@ -95,6 +95,12 @@ require("raindrop-md").setup({
   keymaps = {
     insert_mode = "<C-b>",  -- Ctrl+b in insert mode (default)
   },
+
+  -- Preload bookmarks on startup for instant picker access
+  preload = true,  -- (default: true)
+
+  -- Delay in milliseconds before preloading (to avoid slowing down startup)
+  preload_delay = 1000,  -- (default: 1000ms = 1 second)
 })
 ```
 
@@ -139,18 +145,22 @@ require("raindrop-md").setup({
 
 ## How It Works
 
-1. **First Run**: The plugin fetches all your bookmarks from Raindrop.io and caches them locally
-2. **Subsequent Runs**: Bookmarks are loaded from cache for instant access
-3. **Auto-refresh**: Cache automatically refreshes after the expiration time (default: 1 hour)
-4. **Manual Refresh**: Use `:RaindropRefresh` or `:RaindropPick!` to force refresh
+1. **Preload on Startup**: By default, bookmarks are preloaded 1 second after Neovim starts
+2. **Instant Access**: Telescope picker opens immediately using cached bookmarks
+3. **Background Updates**: Cache automatically checks and updates in background if incomplete or expired
+4. **Smart Caching**: Compares local count with API to detect new bookmarks
+5. **Manual Refresh**: Use `:RaindropRefresh` or `:RaindropPick!` to force refresh
 
 ## Features in Detail
 
 ### Caching
 
-- Bookmarks are cached locally to minimize API calls
+- Bookmarks are automatically preloaded 1 second after startup
+- Cached locally to minimize API calls and provide instant access
+- Background updates when cache is incomplete or expired
 - Default cache expiration: 1 hour (configurable)
 - Cache location: `~/.local/share/nvim/raindrop-md-cache.json`
+- Disable preload by setting `preload = false` in config
 
 ### Telescope Integration
 

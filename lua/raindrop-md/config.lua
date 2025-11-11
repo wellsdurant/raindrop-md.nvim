@@ -24,6 +24,10 @@ M.defaults = {
     -- Insert mode keymap for picking bookmarks
     insert_mode = "<C-b>",
   },
+  -- Preload bookmarks on startup for instant picker access
+  preload = true,
+  -- Delay in milliseconds before preloading (to avoid slowing down startup)
+  preload_delay = 1000,
 }
 
 M.options = {}

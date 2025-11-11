@@ -96,6 +96,54 @@ function M.clear()
   vim.notify("raindrop-md: Cache cleared", vim.log.levels.INFO)
 end
 
+--- Preload bookmarks silently in background
+function M.preload()
+  -- Check if we already have valid cache
+  local cache_data = read_cache_data()
+
+  if cache_data and cache_data.bookmarks and #cache_data.bookmarks > 0 then
+    -- We have cache, check if it needs updating
+    if is_cache_valid() then
+      local cached_count = #cache_data.bookmarks
+      local stored_count = cache_data.count or cached_count
+
+      -- Check if cache is complete
+      api.get_bookmark_count(function(result)
+        if not result.error then
+          local api_count = result.count or 0
+          if cached_count ~= api_count or cached_count ~= stored_count then
+            -- Cache incomplete, update silently
+            fetch_in_background(true)
+          end
+        end
+      end)
+    else
+      -- Cache expired, update in background
+      fetch_in_background(true)
+    end
+  else
+    -- No cache, fetch silently
+    if operation_in_progress then
+      return
+    end
+
+    operation_in_progress = true
+
+    api.fetch_bookmarks(function(result)
+      operation_in_progress = false
+
+      if result.error then
+        -- Silent failure during preload
+        return
+      end
+
+      local bookmarks = result.bookmarks or {}
+      local count = result.count or #bookmarks
+      M.write(bookmarks, count)
+    end)
+  end
+end
+
 --- Fetch all bookmarks and update cache
 --- @param callback function Callback function
 local function fetch_and_cache(callback)

@@ -21,6 +21,14 @@ function M.setup(opts)
       })
     end
   end
+
+  -- Preload bookmarks if enabled
+  if config.get("preload") then
+    local preload_delay = config.get("preload_delay") or 1000
+    vim.defer_fn(function()
+      M.preload_bookmarks()
+    end, preload_delay)
+  end
 end
 
 --- Internal function to pick bookmark from insert mode
@@ -57,6 +65,11 @@ end
 --- Clear cached bookmarks
 function M.clear_cache()
   cache.clear()
+end
+
+--- Preload bookmarks silently in background
+function M.preload_bookmarks()
+  cache.preload()
 end
 
 return M
