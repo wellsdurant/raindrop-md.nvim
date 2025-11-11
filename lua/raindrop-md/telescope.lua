@@ -20,18 +20,38 @@ local status_timer = nil
 local function insert_bookmark(bookmark)
   local markdown_link = string.format("[%s](%s)", bookmark.title, bookmark.url)
 
+  -- Validate window and buffer are still valid
+  local win = vim.api.nvim_get_current_win()
+  if not vim.api.nvim_win_is_valid(win) then
+    vim.notify("raindrop-md: Invalid window", vim.log.levels.ERROR)
+    return
+  end
+
+  local buf = vim.api.nvim_win_get_buf(win)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    vim.notify("raindrop-md: Invalid buffer", vim.log.levels.ERROR)
+    return
+  end
+
   -- Get current cursor position
-  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+  local row, col = unpack(vim.api.nvim_win_get_cursor(win))
 
   -- Get current line
-  local line = vim.api.nvim_get_current_line()
+  local line = vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1] or ""
 
   -- Insert link after cursor position (we're in normal mode, cursor is ON a character)
   local new_line = line:sub(1, col + 1) .. markdown_link .. line:sub(col + 2)
-  vim.api.nvim_set_current_line(new_line)
+  vim.api.nvim_buf_set_lines(buf, row - 1, row, false, { new_line })
+
+  -- Calculate new cursor position and ensure it's within bounds
+  local new_col = col + 1 + #markdown_link
+  local max_col = #new_line
+  if new_col > max_col then
+    new_col = max_col
+  end
 
   -- Move cursor to end of inserted text
-  vim.api.nvim_win_set_cursor(0, { row, col + 1 + #markdown_link })
+  vim.api.nvim_win_set_cursor(win, { row, new_col })
 
   -- Return to insert mode one position after the bookmark
   vim.cmd("startinsert!")
