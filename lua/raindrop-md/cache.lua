@@ -169,13 +169,18 @@ function M.preload()
     if is_cache_valid() then
       local cached_count = #cache_data.bookmarks
       local stored_count = cache_data.count or cached_count
+      local cached_last_updated = cache_data.last_updated
 
-      -- Check if cache is complete
-      api.get_bookmark_count(function(result)
+      -- Check if cache is up to date
+      api.get_bookmark_metadata(function(result)
         if not result.error then
           local api_count = result.count or 0
-          if cached_count ~= api_count or cached_count ~= stored_count then
-            -- Cache incomplete, update incrementally
+          local api_last_update = result.last_update
+
+          -- Update if count changed OR if there are newer modifications
+          if cached_count ~= api_count or cached_count ~= stored_count or
+             (api_last_update and cached_last_updated and api_last_update > cached_last_updated) then
+            -- Cache outdated, update incrementally
             fetch_in_background(true, true)
           end
         end
@@ -363,20 +368,36 @@ function M.get_bookmarks(force_refresh, callback, ui_callback)
       -- Cache expired, update incrementally in background
       fetch_in_background(false, true)
     else
-      -- Check if cache is complete
-      api.get_bookmark_count(function(result)
+      -- Check if cache needs updating (by count or modification time)
+      local cached_last_updated = cache_data.last_updated
+
+      api.get_bookmark_metadata(function(result)
         if not result.error then
           local api_count = result.count or 0
-          if cached_count ~= api_count or cached_count ~= stored_count then
-            -- Cache incomplete, update incrementally in background
-            local diff = api_count - cached_count
-            vim.notify(
-              string.format(
-                "raindrop-md: Detected %d new/modified bookmarks, updating...",
-                math.abs(diff)
-              ),
-              vim.log.levels.INFO
-            )
+          local api_last_update = result.last_update
+
+          -- Check if count changed OR if there are newer modifications
+          local count_changed = cached_count ~= api_count or cached_count ~= stored_count
+          local has_modifications = api_last_update and cached_last_updated and api_last_update > cached_last_updated
+
+          if count_changed or has_modifications then
+            -- Cache outdated, update incrementally in background
+            if count_changed then
+              local diff = api_count - cached_count
+              vim.notify(
+                string.format(
+                  "raindrop-md: Detected %d %s, updating...",
+                  math.abs(diff),
+                  diff > 0 and "new bookmarks" or "changes"
+                ),
+                vim.log.levels.INFO
+              )
+            else
+              vim.notify(
+                "raindrop-md: Detected bookmark modifications, updating...",
+                vim.log.levels.INFO
+              )
+            end
             update_status(string.format("Raindrop Bookmarks (%d) - Updating...", cached_count))
             fetch_in_background(true, true)
           else

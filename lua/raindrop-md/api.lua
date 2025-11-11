@@ -5,9 +5,9 @@ local M = {}
 
 local API_BASE_URL = "https://api.raindrop.io/rest/v1"
 
---- Get total bookmark count without fetching all data
+--- Get bookmark metadata (count and last update time)
 --- @param callback function Callback function
-function M.get_bookmark_count(callback)
+function M.get_bookmark_metadata(callback)
   local token = config.get("token")
 
   if not token or token == "" then
@@ -15,8 +15,8 @@ function M.get_bookmark_count(callback)
     return
   end
 
-  -- Fetch first page with just 1 item to get total count
-  local url = string.format("%s/raindrops/0?page=0&perpage=1", API_BASE_URL)
+  -- Fetch first item sorted by last update to get most recent modification time
+  local url = string.format("%s/raindrops/0?page=0&perpage=1&sort=-lastUpdate", API_BASE_URL)
 
   curl.get(url, {
     headers = {
@@ -35,9 +35,29 @@ function M.get_bookmark_count(callback)
         return
       end
 
-      callback({ count = parsed.count or 0 })
+      local last_update = nil
+      if parsed.items and #parsed.items > 0 then
+        last_update = parsed.items[1].lastUpdate or parsed.items[1].created
+      end
+
+      callback({
+        count = parsed.count or 0,
+        last_update = last_update
+      })
     end),
   })
+end
+
+--- Get total bookmark count without fetching all data (legacy function)
+--- @param callback function Callback function
+function M.get_bookmark_count(callback)
+  M.get_bookmark_metadata(function(result)
+    if result.error then
+      callback({ error = result.error })
+    else
+      callback({ count = result.count })
+    end
+  end)
 end
 
 --- Fetch bookmarks modified since a timestamp (incremental update)
