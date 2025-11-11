@@ -13,26 +13,29 @@ function M.setup(opts)
   local keymaps = config.get("keymaps")
   if keymaps and keymaps ~= false then
     if keymaps.insert_mode then
-      vim.keymap.set("i", keymaps.insert_mode, function()
-        -- Check if current buffer is markdown
-        if vim.bo.filetype == "markdown" then
-          -- Exit insert mode first
-          vim.cmd("stopinsert")
-          -- Schedule the picker to run after mode change completes
-          vim.schedule(function()
-            M.pick_bookmark()
-          end)
-        else
-          -- Fallback to default behavior if not in markdown
-          local key = vim.api.nvim_replace_termcodes(keymaps.insert_mode, true, false, true)
-          vim.api.nvim_feedkeys(key, "n", false)
-        end
-      end, {
+      -- Use <Cmd> mapping which works better with completion plugins
+      vim.keymap.set("i", keymaps.insert_mode, "<Cmd>lua require('raindrop-md')._pick_from_insert()<CR>", {
         desc = "Pick Raindrop bookmark to insert",
-        noremap = false,
+        noremap = true,
+        silent = true,
       })
     end
   end
+end
+
+--- Internal function to pick bookmark from insert mode
+function M._pick_from_insert()
+  -- Check if current buffer is markdown
+  if vim.bo.filetype ~= "markdown" then
+    vim.notify("raindrop-md: Only works in markdown files", vim.log.levels.WARN)
+    return
+  end
+
+  -- Exit insert mode and run picker
+  vim.cmd("stopinsert")
+  vim.schedule(function()
+    M.pick_bookmark()
+  end)
 end
 
 --- Pick a bookmark using Telescope
