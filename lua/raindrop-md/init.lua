@@ -64,21 +64,11 @@ function M._pick_from_insert()
     return
   end
 
-  -- Exit insert mode and ensure we're in a stable state
+  -- Exit insert mode and run picker
   vim.cmd("stopinsert")
-
-  -- Wait for mode transition to complete before opening telescope
-  vim.defer_fn(function()
-    -- Verify we're actually in normal mode
-    if vim.api.nvim_get_mode().mode == "n" then
-      M.pick_bookmark()
-    else
-      -- Wait a bit more if not in normal mode yet
-      vim.defer_fn(function()
-        M.pick_bookmark()
-      end, 50)
-    end
-  end, 50)
+  vim.schedule(function()
+    M.pick_bookmark()
+  end)
 end
 
 --- Pick a bookmark using Telescope

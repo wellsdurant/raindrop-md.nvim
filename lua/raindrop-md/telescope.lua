@@ -20,32 +20,18 @@ local status_timer = nil
 local function insert_bookmark(bookmark)
   local markdown_link = string.format("[%s](%s)", bookmark.title, bookmark.url)
 
-  -- Get current window and buffer
-  local win = vim.api.nvim_get_current_win()
-  local buf = vim.api.nvim_get_current_buf()
-
-  -- Validate window and buffer
-  if not vim.api.nvim_win_is_valid(win) or not vim.api.nvim_buf_is_valid(buf) then
-    vim.notify("raindrop-md: Invalid window or buffer", vim.log.levels.ERROR)
-    return
-  end
-
   -- Get current cursor position
-  local cursor = vim.api.nvim_win_get_cursor(win)
-  local row, col = cursor[1], cursor[2]
+  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
 
   -- Get current line
-  local line = vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1] or ""
+  local line = vim.api.nvim_get_current_line()
 
   -- Insert link after cursor position (we're in normal mode, cursor is ON a character)
   local new_line = line:sub(1, col + 1) .. markdown_link .. line:sub(col + 2)
-  vim.api.nvim_buf_set_lines(buf, row - 1, row, false, { new_line })
-
-  -- Calculate new cursor position
-  local new_col = col + 1 + #markdown_link
+  vim.api.nvim_set_current_line(new_line)
 
   -- Move cursor to end of inserted text
-  pcall(vim.api.nvim_win_set_cursor, win, { row, new_col })
+  vim.api.nvim_win_set_cursor(0, { row, col + 1 + #markdown_link })
 
   -- Return to insert mode one position after the bookmark
   vim.cmd("startinsert!")
@@ -171,26 +157,13 @@ function M.pick_bookmark(opts)
         attach_mappings = function(prompt_bufnr, map)
           actions.select_default:replace(function()
             local selection = action_state.get_selected_entry()
-
-            -- Save the bookmark for later insertion
-            local bookmark_to_insert = selection and selection.value or nil
-
-            -- Close telescope
             actions.close(prompt_bufnr)
 
-            if bookmark_to_insert then
-              -- Use longer delay to ensure all of telescope's async cleanup completes
-              vim.defer_fn(function()
-                -- Verify we're in a valid state before inserting
-                if vim.api.nvim_get_mode().mode == "n" then
-                  insert_bookmark(bookmark_to_insert)
-                else
-                  -- If not in normal mode, wait a bit more
-                  vim.defer_fn(function()
-                    insert_bookmark(bookmark_to_insert)
-                  end, 50)
-                end
-              end, 150) -- Increased to 150ms
+            if selection then
+              -- Schedule insert_bookmark to run after Telescope fully closes
+              vim.schedule(function()
+                insert_bookmark(selection.value)
+              end)
             end
           end)
 
