@@ -28,6 +28,10 @@ M.defaults = {
   preload = true,
   -- Delay in milliseconds before preloading (to avoid slowing down startup)
   preload_delay = 1000,
+  -- Auto-update cache when opening markdown files
+  auto_update = true,
+  -- Minimum time between auto-updates in seconds (to avoid spam)
+  auto_update_interval = 300, -- 5 minutes
 }
 
 M.options = {}

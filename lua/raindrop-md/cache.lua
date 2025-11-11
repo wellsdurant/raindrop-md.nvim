@@ -159,8 +159,9 @@ local function update_status(message)
   end
 end
 
---- Preload bookmarks silently in background
-function M.preload()
+--- Check and update cache if needed (for auto-update)
+--- @param silent boolean Don't show notifications
+local function check_and_update(silent)
   -- Check if we already have valid cache
   local cache_data = read_cache_data()
 
@@ -181,18 +182,28 @@ function M.preload()
           if cached_count ~= api_count or cached_count ~= stored_count or
              (api_last_update and cached_last_updated and api_last_update > cached_last_updated) then
             -- Cache outdated, update incrementally
-            fetch_in_background(true, true)
+            fetch_in_background(silent, true)
           end
         end
       end)
     else
       -- Cache expired, update incrementally
-      fetch_in_background(true, true)
+      fetch_in_background(silent, true)
     end
   else
-    -- No cache, must do full fetch silently
-    fetch_in_background(true, false)
+    -- No cache, must do full fetch
+    fetch_in_background(silent, false)
   end
+end
+
+--- Preload bookmarks silently in background
+function M.preload()
+  check_and_update(true)
+end
+
+--- Auto-update cache (triggered by autocommand)
+function M.auto_update()
+  check_and_update(true)
 end
 
 --- Fetch all bookmarks and update cache

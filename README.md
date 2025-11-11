@@ -101,6 +101,12 @@ require("raindrop-md").setup({
 
   -- Delay in milliseconds before preloading (to avoid slowing down startup)
   preload_delay = 1000,  -- (default: 1000ms = 1 second)
+
+  -- Auto-update cache when opening markdown files
+  auto_update = true,  -- (default: true)
+
+  -- Minimum time between auto-updates in seconds (to avoid spam)
+  auto_update_interval = 300,  -- (default: 300s = 5 minutes)
 })
 ```
 
@@ -146,21 +152,24 @@ require("raindrop-md").setup({
 ## How It Works
 
 1. **Preload on Startup**: By default, bookmarks are preloaded 1 second after Neovim starts
-2. **Instant Access**: Telescope picker opens immediately using cached bookmarks
-3. **Background Updates**: Cache automatically checks and updates in background if incomplete or expired
-4. **Smart Caching**: Compares local count with API to detect new bookmarks
-5. **Manual Refresh**: Use `:RaindropRefresh` or `:RaindropPick!` to force refresh
+2. **Auto-Update on Markdown Open**: Cache automatically updates when you open markdown files (max once per 5 minutes)
+3. **Instant Access**: Telescope picker opens immediately using cached bookmarks
+4. **Background Updates**: Cache checks and updates in background without blocking your work
+5. **Smart Detection**: Detects both new bookmarks and modifications to existing ones
+6. **Manual Refresh**: Use `:RaindropRefresh` or `:RaindropPick!` to force refresh
 
 ## Features in Detail
 
 ### Caching
 
 - Bookmarks are automatically preloaded 1 second after startup
+- Auto-updates when opening markdown files (every 5 minutes max)
 - Cached locally to minimize API calls and provide instant access
 - Background updates when cache is incomplete or expired
+- Detects both new bookmarks and modifications
 - Default cache expiration: 1 hour (configurable)
 - Cache location: `~/.local/share/nvim/raindrop-md-cache.json`
-- Disable preload by setting `preload = false` in config
+- Disable auto-update by setting `auto_update = false` in config
 
 ### Telescope Integration
 

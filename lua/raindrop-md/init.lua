@@ -4,6 +4,9 @@ local config = require("raindrop-md.config")
 local telescope = require("raindrop-md.telescope")
 local cache = require("raindrop-md.cache")
 
+-- Track last auto-update time to avoid spam
+local last_auto_update = 0
+
 --- Setup function to initialize the plugin
 --- @param opts table|nil Configuration options
 function M.setup(opts)
@@ -28,6 +31,28 @@ function M.setup(opts)
     vim.defer_fn(function()
       M.preload_bookmarks()
     end, preload_delay)
+  end
+
+  -- Set up auto-update on markdown file open
+  if config.get("auto_update") then
+    local auto_update_interval = config.get("auto_update_interval") or 300
+
+    vim.api.nvim_create_augroup("RaindropMdAutoUpdate", { clear = true })
+    vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter" }, {
+      group = "RaindropMdAutoUpdate",
+      pattern = "*.md",
+      callback = function()
+        local current_time = os.time()
+        -- Only update if enough time has passed since last update
+        if current_time - last_auto_update >= auto_update_interval then
+          last_auto_update = current_time
+          -- Update cache in background (non-blocking)
+          vim.defer_fn(function()
+            cache.auto_update()
+          end, 100) -- Small delay to not block file opening
+        end
+      end,
+    })
   end
 end
 
