@@ -7,6 +7,9 @@ local M = {}
 local operation_in_progress = false
 local operation_callbacks = {}
 
+-- Status callback for UI updates
+local status_callback = nil
+
 --- Check if cache file exists and is valid
 --- @return boolean
 local function is_cache_valid()
@@ -135,6 +138,27 @@ function M.clear()
   vim.notify("raindrop-md: Cache cleared", vim.log.levels.INFO)
 end
 
+--- Register status callback for UI updates
+--- @param callback function Callback function(status_message)
+function M.register_status_callback(callback)
+  status_callback = callback
+end
+
+--- Unregister status callback
+function M.unregister_status_callback()
+  status_callback = nil
+end
+
+--- Send status update to UI
+--- @param message string Status message
+local function update_status(message)
+  if status_callback then
+    vim.schedule(function()
+      status_callback(message)
+    end)
+  end
+end
+
 --- Preload bookmarks silently in background
 function M.preload()
   -- Check if we already have valid cache
@@ -212,6 +236,7 @@ local function fetch_in_background(silent, incremental)
       if not silent then
         vim.notify("raindrop-md: Checking for updates...", vim.log.levels.INFO)
       end
+      update_status("Raindrop Bookmarks - Checking for updates...")
 
       api.fetch_bookmarks_since(cache_data.last_updated, function(result)
         operation_in_progress = false
@@ -223,6 +248,7 @@ local function fetch_in_background(silent, incremental)
               vim.log.levels.WARN
             )
           end
+          update_status("Raindrop Bookmarks - Update failed")
           return
         end
 
@@ -238,9 +264,11 @@ local function fetch_in_background(silent, incremental)
               vim.log.levels.INFO
             )
           end
+          update_status(string.format("Raindrop Bookmarks (%d) - Updated +%d", #merged, #updates))
         else
           -- No updates, just update the timestamp
           M.write(cache_data.bookmarks, cache_data.count, cache_data.last_updated)
+          update_status(string.format("Raindrop Bookmarks (%d) - Up to date", #cache_data.bookmarks))
         end
       end)
       return
@@ -251,6 +279,7 @@ local function fetch_in_background(silent, incremental)
   if not silent then
     vim.notify("raindrop-md: Fetching all bookmarks in background...", vim.log.levels.INFO)
   end
+  update_status("Raindrop Bookmarks - Fetching all...")
 
   api.fetch_bookmarks(function(result)
     operation_in_progress = false
@@ -262,6 +291,7 @@ local function fetch_in_background(silent, incremental)
           vim.log.levels.WARN
         )
       end
+      update_status("Raindrop Bookmarks - Fetch failed")
       return
     end
 
@@ -275,13 +305,20 @@ local function fetch_in_background(silent, incremental)
         vim.log.levels.INFO
       )
     end
+    update_status(string.format("Raindrop Bookmarks - Fetched %d bookmarks", #bookmarks))
   end)
 end
 
 --- Get bookmarks (from cache or API)
 --- @param force_refresh boolean Force refresh from API
 --- @param callback function Callback function
-function M.get_bookmarks(force_refresh, callback)
+--- @param ui_callback function|nil Optional UI status callback
+function M.get_bookmarks(force_refresh, callback, ui_callback)
+  -- Register UI callback if provided
+  if ui_callback then
+    M.register_status_callback(ui_callback)
+  end
+
   -- If force refresh, block and wait for fresh data
   if force_refresh then
     if operation_in_progress then
@@ -318,6 +355,7 @@ function M.get_bookmarks(force_refresh, callback)
       string.format("raindrop-md: Showing %d cached bookmarks", cached_count),
       vim.log.levels.INFO
     )
+    update_status(string.format("Raindrop Bookmarks (%d)", cached_count))
     callback(cache_data.bookmarks)
 
     -- Check if we need to update in background
@@ -339,7 +377,11 @@ function M.get_bookmarks(force_refresh, callback)
               ),
               vim.log.levels.INFO
             )
+            update_status(string.format("Raindrop Bookmarks (%d) - Updating...", cached_count))
             fetch_in_background(true, true)
+          else
+            -- Cache is up to date
+            update_status(string.format("Raindrop Bookmarks (%d) - Up to date", cached_count))
           end
         end
       end)

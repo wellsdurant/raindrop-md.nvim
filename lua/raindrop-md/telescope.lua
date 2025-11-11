@@ -11,6 +11,10 @@ local config = require("raindrop-md.config")
 
 local M = {}
 
+-- Store active picker for status updates
+local active_picker = nil
+local status_timer = nil
+
 --- Insert bookmark link at cursor position
 --- @param bookmark table
 local function insert_bookmark(bookmark)
@@ -50,6 +54,15 @@ local function make_display(bookmark)
   })
 end
 
+--- Update picker prompt title with status
+--- @param picker table Telescope picker instance
+--- @param status string Status message
+local function update_picker_status(picker, status)
+  if picker and picker.prompt_border then
+    picker.prompt_border:change_title(status)
+  end
+end
+
 --- Open telescope picker for bookmarks
 --- @param opts table|nil Options for telescope picker
 function M.pick_bookmark(opts)
@@ -65,6 +78,13 @@ function M.pick_bookmark(opts)
     return
   end
 
+  -- Status callback for cache updates
+  local status_callback = function(status)
+    if active_picker then
+      update_picker_status(active_picker, status)
+    end
+  end
+
   cache.get_bookmarks(opts.force_refresh or false, function(bookmarks)
     if not bookmarks or #bookmarks == 0 then
       vim.notify("raindrop-md: No bookmarks found", vim.log.levels.WARN)
@@ -72,10 +92,11 @@ function M.pick_bookmark(opts)
     end
 
     local telescope_opts = vim.tbl_deep_extend("force", config.get("telescope_opts"), opts)
+    local base_title = telescope_opts.prompt_title
 
-    pickers
+    local picker = pickers
       .new(telescope_opts, {
-        prompt_title = telescope_opts.prompt_title,
+        prompt_title = base_title,
         finder = finders.new_table({
           results = bookmarks,
           entry_maker = function(entry)
@@ -133,8 +154,24 @@ function M.pick_bookmark(opts)
           return true
         end,
       })
-      :find()
-  end)
+
+    -- Store picker reference for status updates
+    active_picker = picker
+
+    -- Register status callback with cache
+    cache.register_status_callback(status_callback)
+
+    -- Clear active picker when closed
+    vim.api.nvim_create_autocmd("WinClosed", {
+      once = true,
+      callback = function()
+        active_picker = nil
+        cache.unregister_status_callback()
+      end,
+    })
+
+    picker:find()
+  end, status_callback)
 end
 
 return M
