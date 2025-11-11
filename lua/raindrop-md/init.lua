@@ -16,7 +16,12 @@ function M.setup(opts)
       vim.keymap.set("i", keymaps.insert_mode, function()
         -- Check if current buffer is markdown
         if vim.bo.filetype == "markdown" then
-          M.pick_bookmark()
+          -- Exit insert mode first
+          vim.cmd("stopinsert")
+          -- Schedule the picker to run after mode change completes
+          vim.schedule(function()
+            M.pick_bookmark()
+          end)
         else
           -- Fallback to default behavior if not in markdown
           local key = vim.api.nvim_replace_termcodes(keymaps.insert_mode, true, false, true)
