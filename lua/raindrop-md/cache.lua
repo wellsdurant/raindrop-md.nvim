@@ -3,6 +3,10 @@ local api = require("raindrop-md.api")
 
 local M = {}
 
+-- Track ongoing operations
+local operation_in_progress = false
+local operation_callbacks = {}
+
 --- Check if cache file exists and is valid
 --- @return boolean
 local function is_cache_valid()
@@ -125,9 +129,30 @@ end
 --- @param force_refresh boolean Force refresh from API
 --- @param callback function Callback function
 function M.get_bookmarks(force_refresh, callback)
+  -- If an operation is already in progress, queue this callback
+  if operation_in_progress then
+    table.insert(operation_callbacks, callback)
+    return
+  end
+
+  -- Mark operation as in progress
+  operation_in_progress = true
+  operation_callbacks = { callback }
+
+  -- Helper to notify all waiting callbacks
+  local function notify_all_callbacks(bookmarks)
+    local callbacks_to_notify = operation_callbacks
+    operation_in_progress = false
+    operation_callbacks = {}
+
+    for _, cb in ipairs(callbacks_to_notify) do
+      cb(bookmarks)
+    end
+  end
+
   -- If force refresh, fetch immediately
   if force_refresh then
-    fetch_and_cache(callback)
+    fetch_and_cache(notify_all_callbacks)
     return
   end
 
@@ -146,7 +171,7 @@ function M.get_bookmarks(force_refresh, callback)
             string.format("raindrop-md: Using cached %d bookmarks", cached_count),
             vim.log.levels.INFO
           )
-          callback(cache_data.bookmarks)
+          notify_all_callbacks(cache_data.bookmarks)
           return
         end
 
@@ -158,7 +183,7 @@ function M.get_bookmarks(force_refresh, callback)
             string.format("raindrop-md: Using cached %d bookmarks (up to date)", cached_count),
             vim.log.levels.INFO
           )
-          callback(cache_data.bookmarks)
+          notify_all_callbacks(cache_data.bookmarks)
         else
           -- Cache is incomplete or outdated, fetch all
           vim.notify(
@@ -169,7 +194,7 @@ function M.get_bookmarks(force_refresh, callback)
             ),
             vim.log.levels.INFO
           )
-          fetch_and_cache(callback)
+          fetch_and_cache(notify_all_callbacks)
         end
       end)
       return
@@ -177,7 +202,7 @@ function M.get_bookmarks(force_refresh, callback)
   end
 
   -- No valid cache, fetch from API
-  fetch_and_cache(callback)
+  fetch_and_cache(notify_all_callbacks)
 end
 
 return M
