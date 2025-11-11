@@ -26,12 +26,12 @@ local function insert_bookmark(bookmark)
   -- Get current line
   local line = vim.api.nvim_get_current_line()
 
-  -- Insert link at cursor position
-  local new_line = line:sub(1, col) .. markdown_link .. line:sub(col + 1)
+  -- Insert link after cursor position (we're in normal mode, cursor is ON a character)
+  local new_line = line:sub(1, col + 1) .. markdown_link .. line:sub(col + 2)
   vim.api.nvim_set_current_line(new_line)
 
   -- Move cursor to end of inserted text
-  vim.api.nvim_win_set_cursor(0, { row, col + #markdown_link })
+  vim.api.nvim_win_set_cursor(0, { row, col + 1 + #markdown_link })
 
   -- Return to insert mode at cursor position
   vim.cmd("startinsert")
