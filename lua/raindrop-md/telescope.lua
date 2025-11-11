@@ -171,13 +171,26 @@ function M.pick_bookmark(opts)
         attach_mappings = function(prompt_bufnr, map)
           actions.select_default:replace(function()
             local selection = action_state.get_selected_entry()
+
+            -- Save the bookmark for later insertion
+            local bookmark_to_insert = selection and selection.value or nil
+
+            -- Close telescope
             actions.close(prompt_bufnr)
 
-            if selection then
-              -- Let telescope fully close and restore state, then insert
+            if bookmark_to_insert then
+              -- Use longer delay to ensure all of telescope's async cleanup completes
               vim.defer_fn(function()
-                insert_bookmark(selection.value)
-              end, 100) -- 100ms delay to ensure telescope cleanup is done
+                -- Verify we're in a valid state before inserting
+                if vim.api.nvim_get_mode().mode == "n" then
+                  insert_bookmark(bookmark_to_insert)
+                else
+                  -- If not in normal mode, wait a bit more
+                  vim.defer_fn(function()
+                    insert_bookmark(bookmark_to_insert)
+                  end, 50)
+                end
+              end, 150) -- Increased to 150ms
             end
           end)
 
