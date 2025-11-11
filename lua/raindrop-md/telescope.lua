@@ -17,24 +17,23 @@ local status_timer = nil
 
 --- Insert bookmark link at cursor position
 --- @param bookmark table
-local function insert_bookmark(bookmark)
+--- @param win number Window handle
+--- @param buf number Buffer handle
+--- @param row number Row position
+--- @param col number Column position
+local function insert_bookmark(bookmark, win, buf, row, col)
   local markdown_link = string.format("[%s](%s)", bookmark.title, bookmark.url)
 
   -- Validate window and buffer are still valid
-  local win = vim.api.nvim_get_current_win()
   if not vim.api.nvim_win_is_valid(win) then
     vim.notify("raindrop-md: Invalid window", vim.log.levels.ERROR)
     return
   end
 
-  local buf = vim.api.nvim_win_get_buf(win)
   if not vim.api.nvim_buf_is_valid(buf) then
     vim.notify("raindrop-md: Invalid buffer", vim.log.levels.ERROR)
     return
   end
-
-  -- Get current cursor position
-  local row, col = unpack(vim.api.nvim_win_get_cursor(win))
 
   -- Get current line
   local line = vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1] or ""
@@ -51,7 +50,7 @@ local function insert_bookmark(bookmark)
   end
 
   -- Move cursor to end of inserted text
-  vim.api.nvim_win_set_cursor(win, { row, new_col })
+  pcall(vim.api.nvim_win_set_cursor, win, { row, new_col })
 
   -- Return to insert mode one position after the bookmark
   vim.cmd("startinsert!")
@@ -177,12 +176,19 @@ function M.pick_bookmark(opts)
         attach_mappings = function(prompt_bufnr, map)
           actions.select_default:replace(function()
             local selection = action_state.get_selected_entry()
+
+            -- Capture the target window/buffer info BEFORE closing telescope
+            local target_win = vim.fn.win_getid(vim.fn.winnr('#'))
+            local target_buf = vim.api.nvim_win_get_buf(target_win)
+            local cursor_pos = vim.api.nvim_win_get_cursor(target_win)
+            local row, col = cursor_pos[1], cursor_pos[2]
+
             actions.close(prompt_bufnr)
 
             if selection then
               -- Schedule insert_bookmark to run after Telescope fully closes
               vim.schedule(function()
-                insert_bookmark(selection.value)
+                insert_bookmark(selection.value, target_win, target_buf, row, col)
               end)
             end
           end)
