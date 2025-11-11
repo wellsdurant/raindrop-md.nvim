@@ -65,17 +65,31 @@ end
 --- Write bookmarks to cache file
 --- @param bookmarks table
 --- @param count number|nil Total count from API
-function M.write(bookmarks, count)
+--- @param last_updated string|nil Last update timestamp
+function M.write(bookmarks, count, last_updated)
   local cache_file = config.get("cache_file")
 
   -- Ensure parent directory exists
   local parent_dir = vim.fn.fnamemodify(cache_file, ":h")
   vim.fn.mkdir(parent_dir, "p")
 
+  -- Find the most recent lastUpdate timestamp
+  local most_recent = last_updated
+  if not most_recent then
+    for _, bookmark in ipairs(bookmarks) do
+      if bookmark.lastUpdate then
+        if not most_recent or bookmark.lastUpdate > most_recent then
+          most_recent = bookmark.lastUpdate
+        end
+      end
+    end
+  end
+
   local data = {
     bookmarks = bookmarks,
     count = count or #bookmarks,
     timestamp = os.time(),
+    last_updated = most_recent or os.date("!%Y-%m-%dT%H:%M:%S.000Z"),
   }
 
   local json_str = vim.json.encode(data)
@@ -87,6 +101,31 @@ function M.write(bookmarks, count)
 
   file:write(json_str)
   file:close()
+end
+
+--- Merge updated bookmarks with existing cache
+--- @param existing table Existing bookmarks
+--- @param updates table New or modified bookmarks
+--- @return table Merged bookmarks
+local function merge_bookmarks(existing, updates)
+  -- Create a map of existing bookmarks by ID
+  local bookmark_map = {}
+  for _, bookmark in ipairs(existing) do
+    bookmark_map[bookmark.id] = bookmark
+  end
+
+  -- Update or add new bookmarks
+  for _, update in ipairs(updates) do
+    bookmark_map[update.id] = update
+  end
+
+  -- Convert back to array
+  local merged = {}
+  for _, bookmark in pairs(bookmark_map) do
+    table.insert(merged, bookmark)
+  end
+
+  return merged
 end
 
 --- Clear the cache file
@@ -112,35 +151,18 @@ function M.preload()
         if not result.error then
           local api_count = result.count or 0
           if cached_count ~= api_count or cached_count ~= stored_count then
-            -- Cache incomplete, update silently
-            fetch_in_background(true)
+            -- Cache incomplete, update incrementally
+            fetch_in_background(true, true)
           end
         end
       end)
     else
-      -- Cache expired, update in background
-      fetch_in_background(true)
+      -- Cache expired, update incrementally
+      fetch_in_background(true, true)
     end
   else
-    -- No cache, fetch silently
-    if operation_in_progress then
-      return
-    end
-
-    operation_in_progress = true
-
-    api.fetch_bookmarks(function(result)
-      operation_in_progress = false
-
-      if result.error then
-        -- Silent failure during preload
-        return
-      end
-
-      local bookmarks = result.bookmarks or {}
-      local count = result.count or #bookmarks
-      M.write(bookmarks, count)
-    end)
+    -- No cache, must do full fetch silently
+    fetch_in_background(true, false)
   end
 end
 
@@ -175,15 +197,59 @@ end
 
 --- Fetch bookmarks in background (non-blocking)
 --- @param silent boolean Don't show notifications
-local function fetch_in_background(silent)
+--- @param incremental boolean Use incremental update if possible
+local function fetch_in_background(silent, incremental)
   if operation_in_progress then
     return
   end
 
   operation_in_progress = true
 
+  -- Try incremental update first if enabled
+  if incremental then
+    local cache_data = read_cache_data()
+    if cache_data and cache_data.last_updated and cache_data.bookmarks then
+      if not silent then
+        vim.notify("raindrop-md: Checking for updates...", vim.log.levels.INFO)
+      end
+
+      api.fetch_bookmarks_since(cache_data.last_updated, function(result)
+        operation_in_progress = false
+
+        if result.error then
+          if not silent then
+            vim.notify(
+              "raindrop-md: Update check failed: " .. (result.error or "Unknown error"),
+              vim.log.levels.WARN
+            )
+          end
+          return
+        end
+
+        local updates = result.bookmarks or {}
+        if #updates > 0 then
+          -- Merge updates with existing bookmarks
+          local merged = merge_bookmarks(cache_data.bookmarks, updates)
+          M.write(merged, result.count)
+
+          if not silent then
+            vim.notify(
+              string.format("raindrop-md: Updated %d bookmarks", #updates),
+              vim.log.levels.INFO
+            )
+          end
+        else
+          -- No updates, just update the timestamp
+          M.write(cache_data.bookmarks, cache_data.count, cache_data.last_updated)
+        end
+      end)
+      return
+    end
+  end
+
+  -- Fall back to full fetch
   if not silent then
-    vim.notify("raindrop-md: Updating bookmarks in background...", vim.log.levels.INFO)
+    vim.notify("raindrop-md: Fetching all bookmarks in background...", vim.log.levels.INFO)
   end
 
   api.fetch_bookmarks(function(result)
@@ -192,7 +258,7 @@ local function fetch_in_background(silent)
     if result.error then
       if not silent then
         vim.notify(
-          "raindrop-md: Background update failed: " .. (result.error or "Unknown error"),
+          "raindrop-md: Background fetch failed: " .. (result.error or "Unknown error"),
           vim.log.levels.WARN
         )
       end
@@ -256,23 +322,24 @@ function M.get_bookmarks(force_refresh, callback)
 
     -- Check if we need to update in background
     if not is_cache_valid() then
-      -- Cache expired, update in background
-      fetch_in_background(false)
+      -- Cache expired, update incrementally in background
+      fetch_in_background(false, true)
     else
       -- Check if cache is complete
       api.get_bookmark_count(function(result)
         if not result.error then
           local api_count = result.count or 0
           if cached_count ~= api_count or cached_count ~= stored_count then
-            -- Cache incomplete, update in background
+            -- Cache incomplete, update incrementally in background
+            local diff = api_count - cached_count
             vim.notify(
               string.format(
-                "raindrop-md: Detected %d new bookmarks, updating in background...",
-                api_count - cached_count
+                "raindrop-md: Detected %d new/modified bookmarks, updating...",
+                math.abs(diff)
               ),
               vim.log.levels.INFO
             )
-            fetch_in_background(true)
+            fetch_in_background(true, true)
           end
         end
       end)

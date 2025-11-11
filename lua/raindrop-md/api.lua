@@ -40,6 +40,88 @@ function M.get_bookmark_count(callback)
   })
 end
 
+--- Fetch bookmarks modified since a timestamp (incremental update)
+--- @param since_timestamp string ISO 8601 timestamp
+--- @param callback function Callback function
+function M.fetch_bookmarks_since(since_timestamp, callback)
+  local token = config.get("token")
+
+  if not token or token == "" then
+    callback({ error = "No API token" })
+    return
+  end
+
+  local all_bookmarks = {}
+  local total_count = 0
+
+  -- Fetch bookmarks sorted by last update, newest first
+  local function fetch_page_since(page)
+    -- Sort by -lastUpdate (newest first), fetch until we hit items older than since_timestamp
+    local url = string.format(
+      "%s/raindrops/0?page=%d&perpage=50&sort=-lastUpdate",
+      API_BASE_URL,
+      page
+    )
+
+    curl.get(url, {
+      headers = {
+        ["Authorization"] = "Bearer " .. token,
+        ["Content-Type"] = "application/json",
+      },
+      callback = vim.schedule_wrap(function(response)
+        if response.status ~= 200 then
+          callback({ error = "API request failed", status = response.status })
+          return
+        end
+
+        local ok, parsed = pcall(vim.json.decode, response.body)
+        if not ok then
+          callback({ error = "JSON parse error" })
+          return
+        end
+
+        total_count = parsed.count or 0
+        local should_continue = false
+
+        if parsed.items then
+          for _, item in ipairs(parsed.items) do
+            -- Check if this item is newer than our since_timestamp
+            local item_updated = item.lastUpdate or item.created
+            if item_updated and item_updated > since_timestamp then
+              table.insert(all_bookmarks, {
+                id = item._id,
+                title = item.title or "Untitled",
+                url = item.link,
+                excerpt = item.excerpt or "",
+                tags = item.tags or {},
+                created = item.created,
+                lastUpdate = item.lastUpdate,
+                domain = item.domain or "",
+                collection = item.collection and item.collection.title or "Unsorted",
+              })
+              should_continue = true
+            end
+          end
+        end
+
+        -- Continue fetching if we found new items and there might be more
+        local fetched_count = page * 50 + (parsed.items and #parsed.items or 0)
+        if should_continue and fetched_count < total_count then
+          fetch_page_since(page + 1)
+        else
+          -- Done fetching updates
+          callback({
+            bookmarks = all_bookmarks,
+            count = total_count,
+          })
+        end
+      end),
+    })
+  end
+
+  fetch_page_since(0)
+end
+
 --- Fetch a single page of bookmarks
 --- @param page number Page number
 --- @param callback function Callback function
@@ -81,6 +163,7 @@ local function fetch_page(page, callback)
             excerpt = item.excerpt or "",
             tags = item.tags or {},
             created = item.created,
+            lastUpdate = item.lastUpdate,
             domain = item.domain or "",
             collection = item.collection and item.collection.title or "Unsorted",
           })
