@@ -17,26 +17,22 @@ local status_timer = nil
 
 --- Insert bookmark link at cursor position
 --- @param bookmark table
---- @param win number Window handle
---- @param buf number Buffer handle
---- @param row number Row position
---- @param col number Column position
-local function insert_bookmark(bookmark, win, buf, row, col)
+local function insert_bookmark(bookmark)
   local markdown_link = string.format("[%s](%s)", bookmark.title, bookmark.url)
 
-  -- Validate window and buffer are still valid
-  if not vim.api.nvim_win_is_valid(win) then
-    vim.notify("raindrop-md: Invalid window", vim.log.levels.ERROR)
+  -- Get current window and buffer
+  local win = vim.api.nvim_get_current_win()
+  local buf = vim.api.nvim_get_current_buf()
+
+  -- Validate window and buffer
+  if not vim.api.nvim_win_is_valid(win) or not vim.api.nvim_buf_is_valid(buf) then
+    vim.notify("raindrop-md: Invalid window or buffer", vim.log.levels.ERROR)
     return
   end
 
-  if not vim.api.nvim_buf_is_valid(buf) then
-    vim.notify("raindrop-md: Invalid buffer", vim.log.levels.ERROR)
-    return
-  end
-
-  -- Switch to the target window
-  vim.api.nvim_set_current_win(win)
+  -- Get current cursor position
+  local cursor = vim.api.nvim_win_get_cursor(win)
+  local row, col = cursor[1], cursor[2]
 
   -- Get current line
   local line = vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1] or ""
@@ -45,20 +41,14 @@ local function insert_bookmark(bookmark, win, buf, row, col)
   local new_line = line:sub(1, col + 1) .. markdown_link .. line:sub(col + 2)
   vim.api.nvim_buf_set_lines(buf, row - 1, row, false, { new_line })
 
-  -- Calculate new cursor position and ensure it's within bounds
+  -- Calculate new cursor position
   local new_col = col + 1 + #markdown_link
-  local max_col = #new_line
-  if new_col > max_col then
-    new_col = max_col
-  end
 
   -- Move cursor to end of inserted text
   pcall(vim.api.nvim_win_set_cursor, win, { row, new_col })
 
   -- Return to insert mode one position after the bookmark
-  vim.schedule(function()
-    vim.cmd("startinsert!")
-  end)
+  vim.cmd("startinsert!")
 end
 
 --- Create entry display for telescope picker
@@ -107,11 +97,6 @@ function M.pick_bookmark(opts)
     )
     return
   end
-
-  -- Capture the original window and cursor position BEFORE opening telescope
-  local original_win = vim.api.nvim_get_current_win()
-  local original_buf = vim.api.nvim_get_current_buf()
-  local original_cursor = vim.api.nvim_win_get_cursor(original_win)
 
   -- Status callback for cache updates
   local status_callback = function(status)
@@ -186,21 +171,13 @@ function M.pick_bookmark(opts)
         attach_mappings = function(prompt_bufnr, map)
           actions.select_default:replace(function()
             local selection = action_state.get_selected_entry()
+            actions.close(prompt_bufnr)
 
             if selection then
-              -- Store the selection for deferred insertion
-              local bookmark_to_insert = selection.value
-
-              -- Close telescope normally
-              actions.close(prompt_bufnr)
-
-              -- Wait for telescope to fully clean up before inserting
-              -- Use timer for more reliable deferred execution
+              -- Let telescope fully close and restore state, then insert
               vim.defer_fn(function()
-                insert_bookmark(bookmark_to_insert, original_win, original_buf, original_cursor[1], original_cursor[2])
-              end, 50) -- 50ms delay
-            else
-              actions.close(prompt_bufnr)
+                insert_bookmark(selection.value)
+              end, 100) -- 100ms delay to ensure telescope cleanup is done
             end
           end)
 
