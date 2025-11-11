@@ -91,13 +91,24 @@ function M.fetch_bookmarks(callback)
       vim.list_extend(all_bookmarks, result.bookmarks)
       total_count = result.count
 
-      -- Check if we need to fetch more pages
+      -- Debug logging
       local fetched_count = #all_bookmarks
+      vim.notify(
+        string.format("raindrop-md: Fetched page %d: %d bookmarks (total: %d/%d)",
+          page, #result.bookmarks, fetched_count, total_count),
+        vim.log.levels.INFO
+      )
+
+      -- Check if we need to fetch more pages
       if fetched_count < total_count then
         -- Fetch next page
         fetch_next_page(page + 1)
       else
         -- All pages fetched
+        vim.notify(
+          string.format("raindrop-md: Completed fetching all %d bookmarks", fetched_count),
+          vim.log.levels.INFO
+        )
         callback({ bookmarks = all_bookmarks })
       end
     end)
