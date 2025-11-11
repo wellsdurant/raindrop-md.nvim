@@ -33,8 +33,8 @@ local function insert_bookmark(bookmark)
   -- Move cursor to end of inserted text
   vim.api.nvim_win_set_cursor(0, { row, col + #markdown_link })
 
-  -- Return to insert mode
-  vim.cmd("startinsert")
+  -- Return to insert mode (use startinsert! to append after cursor)
+  vim.cmd("startinsert!")
 end
 
 --- Create entry display for telescope picker
@@ -157,7 +157,10 @@ function M.pick_bookmark(opts)
             actions.close(prompt_bufnr)
 
             if selection then
-              insert_bookmark(selection.value)
+              -- Schedule insert_bookmark to run after Telescope fully closes
+              vim.schedule(function()
+                insert_bookmark(selection.value)
+              end)
             end
           end)
 
