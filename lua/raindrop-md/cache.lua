@@ -125,84 +125,132 @@ local function fetch_and_cache(callback)
   end)
 end
 
+--- Fetch bookmarks in background (non-blocking)
+--- @param silent boolean Don't show notifications
+local function fetch_in_background(silent)
+  if operation_in_progress then
+    return
+  end
+
+  operation_in_progress = true
+
+  if not silent then
+    vim.notify("raindrop-md: Updating bookmarks in background...", vim.log.levels.INFO)
+  end
+
+  api.fetch_bookmarks(function(result)
+    operation_in_progress = false
+
+    if result.error then
+      if not silent then
+        vim.notify(
+          "raindrop-md: Background update failed: " .. (result.error or "Unknown error"),
+          vim.log.levels.WARN
+        )
+      end
+      return
+    end
+
+    local bookmarks = result.bookmarks or {}
+    local count = result.count or #bookmarks
+    M.write(bookmarks, count)
+
+    if not silent then
+      vim.notify(
+        string.format("raindrop-md: Updated cache with %d bookmarks", #bookmarks),
+        vim.log.levels.INFO
+      )
+    end
+  end)
+end
+
 --- Get bookmarks (from cache or API)
 --- @param force_refresh boolean Force refresh from API
 --- @param callback function Callback function
 function M.get_bookmarks(force_refresh, callback)
-  -- If an operation is already in progress, queue this callback
-  if operation_in_progress then
-    table.insert(operation_callbacks, callback)
-    return
-  end
-
-  -- Mark operation as in progress
-  operation_in_progress = true
-  operation_callbacks = { callback }
-
-  -- Helper to notify all waiting callbacks
-  local function notify_all_callbacks(bookmarks)
-    local callbacks_to_notify = operation_callbacks
-    operation_in_progress = false
-    operation_callbacks = {}
-
-    for _, cb in ipairs(callbacks_to_notify) do
-      cb(bookmarks)
-    end
-  end
-
-  -- If force refresh, fetch immediately
+  -- If force refresh, block and wait for fresh data
   if force_refresh then
+    if operation_in_progress then
+      table.insert(operation_callbacks, callback)
+      return
+    end
+
+    operation_in_progress = true
+    operation_callbacks = { callback }
+
+    local function notify_all_callbacks(bookmarks)
+      local callbacks_to_notify = operation_callbacks
+      operation_in_progress = false
+      operation_callbacks = {}
+
+      for _, cb in ipairs(callbacks_to_notify) do
+        cb(bookmarks)
+      end
+    end
+
     fetch_and_cache(notify_all_callbacks)
     return
   end
 
-  -- Check if cache exists and is valid (not expired)
-  if is_cache_valid() then
-    local cache_data = read_cache_data()
-    if cache_data and cache_data.bookmarks then
-      local cached_count = #cache_data.bookmarks
-      local stored_count = cache_data.count or cached_count
+  -- Try to read from cache (even if expired or incomplete)
+  local cache_data = read_cache_data()
 
-      -- Check if cache is complete by comparing with API count
+  if cache_data and cache_data.bookmarks and #cache_data.bookmarks > 0 then
+    local cached_count = #cache_data.bookmarks
+    local stored_count = cache_data.count or cached_count
+
+    -- Return cached data immediately
+    vim.notify(
+      string.format("raindrop-md: Showing %d cached bookmarks", cached_count),
+      vim.log.levels.INFO
+    )
+    callback(cache_data.bookmarks)
+
+    -- Check if we need to update in background
+    if not is_cache_valid() then
+      -- Cache expired, update in background
+      fetch_in_background(false)
+    else
+      -- Check if cache is complete
       api.get_bookmark_count(function(result)
-        if result.error then
-          -- If count check fails, use cache
-          vim.notify(
-            string.format("raindrop-md: Using cached %d bookmarks", cached_count),
-            vim.log.levels.INFO
-          )
-          notify_all_callbacks(cache_data.bookmarks)
-          return
-        end
-
-        local api_count = result.count or 0
-
-        -- If counts match, use cache
-        if cached_count == api_count and cached_count == stored_count then
-          vim.notify(
-            string.format("raindrop-md: Using cached %d bookmarks (up to date)", cached_count),
-            vim.log.levels.INFO
-          )
-          notify_all_callbacks(cache_data.bookmarks)
-        else
-          -- Cache is incomplete or outdated, fetch all
-          vim.notify(
-            string.format(
-              "raindrop-md: Cache incomplete (cached: %d, API: %d), fetching all...",
-              cached_count,
-              api_count
-            ),
-            vim.log.levels.INFO
-          )
-          fetch_and_cache(notify_all_callbacks)
+        if not result.error then
+          local api_count = result.count or 0
+          if cached_count ~= api_count or cached_count ~= stored_count then
+            -- Cache incomplete, update in background
+            vim.notify(
+              string.format(
+                "raindrop-md: Detected %d new bookmarks, updating in background...",
+                api_count - cached_count
+              ),
+              vim.log.levels.INFO
+            )
+            fetch_in_background(true)
+          end
         end
       end)
+    end
+  else
+    -- No cache at all, must fetch (block)
+    if operation_in_progress then
+      table.insert(operation_callbacks, callback)
       return
     end
-  end
 
-  -- No valid cache, fetch from API
-  fetch_and_cache(notify_all_callbacks)
+    operation_in_progress = true
+    operation_callbacks = { callback }
+
+    local function notify_all_callbacks(bookmarks)
+      local callbacks_to_notify = operation_callbacks
+      operation_in_progress = false
+      operation_callbacks = {}
+
+      for _, cb in ipairs(callbacks_to_notify) do
+        cb(bookmarks)
+      end
+    end
+
+    fetch_and_cache(notify_all_callbacks)
+  end
 end
 
 return M
