@@ -33,8 +33,8 @@ local function insert_bookmark(bookmark)
   -- Move cursor to end of inserted text
   vim.api.nvim_win_set_cursor(0, { row, col + #markdown_link })
 
-  -- Return to insert mode (use startinsert! to append after cursor)
-  vim.cmd("startinsert!")
+  -- Return to insert mode at cursor position
+  vim.cmd("startinsert")
 end
 
 --- Create entry display for telescope picker
