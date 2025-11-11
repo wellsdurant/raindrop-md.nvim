@@ -1,0 +1,130 @@
+*raindrop-md.txt*  Raindrop.io bookmarks integration for Neovim
+
+Author: Wells Durant
+License: MIT
+
+==============================================================================
+CONTENTS                                                 *raindrop-md-contents*
+
+    1. Introduction ......................... |raindrop-md-introduction|
+    2. Requirements ......................... |raindrop-md-requirements|
+    3. Setup ................................ |raindrop-md-setup|
+    4. Commands ............................. |raindrop-md-commands|
+    5. Configuration ........................ |raindrop-md-configuration|
+    6. API .................................. |raindrop-md-api|
+
+==============================================================================
+INTRODUCTION                                         *raindrop-md-introduction*
+
+raindrop-md.nvim is a Neovim plugin that integrates Raindrop.io bookmarks
+with Telescope, allowing you to quickly insert bookmark links into markdown
+files.
+
+Features:
+  - Fetch bookmarks from your Raindrop.io account
+  - Local caching for fast access
+  - Beautiful Telescope picker interface
+  - Insert bookmarks as markdown links [title](url)
+  - Auto-refresh and manual cache management
+  - Only works in markdown files (by design)
+
+==============================================================================
+REQUIREMENTS                                         *raindrop-md-requirements*
+
+- Neovim >= 0.8.0
+- telescope.nvim (https://github.com/nvim-telescope/telescope.nvim)
+- plenary.nvim (https://github.com/nvim-lua/plenary.nvim)
+- A Raindrop.io account with API token
+
+==============================================================================
+SETUP                                                       *raindrop-md-setup*
+
+To get started, call the setup function with your Raindrop.io API token:
+>
+    require("raindrop-md").setup({
+      token = "your_raindrop_api_token_here",
+    })
+<
+
+To get your API token:
+1. Go to https://raindrop.io
+2. Navigate to Settings → Integrations → For Developers
+3. Click "Create new app"
+4. Generate a test token
+5. Copy the token and use it in your configuration
+
+==============================================================================
+COMMANDS                                                 *raindrop-md-commands*
+
+                                                               *:RaindropPick*
+:RaindropPick[!]
+    Open Telescope picker to select a bookmark. Use ! to force refresh
+    bookmarks from the API before picking.
+
+                                                            *:RaindropRefresh*
+:RaindropRefresh
+    Manually refresh bookmarks from Raindrop.io API.
+
+                                                         *:RaindropClearCache*
+:RaindropClearCache
+    Clear the local bookmark cache.
+
+==============================================================================
+CONFIGURATION                                       *raindrop-md-configuration*
+
+Default configuration:
+>
+    {
+      -- Your Raindrop.io API token (required)
+      token = nil,
+
+      -- Cache file location
+      cache_file = vim.fn.stdpath("data") .. "/raindrop-md-cache.json",
+
+      -- Cache expiration time in seconds (default: 1 hour)
+      cache_expiration = 3600,
+
+      -- Date format for display
+      date_format = "%Y-%m-%d",
+
+      -- Telescope picker options
+      telescope_opts = {
+        prompt_title = "Raindrop Bookmarks",
+        layout_strategy = "horizontal",
+        layout_config = {
+          width = 0.8,
+          height = 0.8,
+          preview_width = 0.6,
+        },
+      },
+    }
+<
+
+==============================================================================
+API                                                           *raindrop-md-api*
+
+                                                        *raindrop-md.setup()*
+raindrop-md.setup({opts})
+    Initialize the plugin with configuration options.
+
+    Parameters: ~
+        {opts} (table) Configuration options
+
+                                                  *raindrop-md.pick_bookmark()*
+raindrop-md.pick_bookmark({opts})
+    Open Telescope picker to select a bookmark.
+
+    Parameters: ~
+        {opts} (table|nil) Options for the picker
+            {force_refresh} (boolean) Force refresh from API
+
+                                              *raindrop-md.refresh_bookmarks()*
+raindrop-md.refresh_bookmarks()
+    Refresh bookmarks from Raindrop.io API.
+
+                                                   *raindrop-md.clear_cache()*
+raindrop-md.clear_cache()
+    Clear the local bookmark cache.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:

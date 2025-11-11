@@ -1,0 +1,202 @@
+# raindrop-md.nvim
+
+A Neovim plugin that integrates [Raindrop.io](https://raindrop.io) bookmarks with Telescope, allowing you to quickly insert bookmark links into markdown files.
+
+## Features
+
+- 🔖 Fetch bookmarks from your Raindrop.io account
+- 💾 Local caching for fast access
+- 🔭 Beautiful Telescope picker interface
+- 📝 Insert bookmarks as markdown links `[title](url)`
+- 🔄 Auto-refresh and manual cache management
+- ✨ Only works in markdown files (by design)
+
+## Requirements
+
+- Neovim >= 0.8.0
+- [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim)
+- [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
+- A [Raindrop.io](https://raindrop.io) account with API token
+
+## Installation
+
+### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
+
+```lua
+{
+  "wellsdurant/raindrop-md.nvim",
+  dependencies = {
+    "nvim-telescope/telescope.nvim",
+    "nvim-lua/plenary.nvim",
+  },
+  config = function()
+    require("raindrop-md").setup({
+      token = "your_raindrop_api_token_here",
+    })
+  end,
+}
+```
+
+### Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
+
+```lua
+use {
+  "wellsdurant/raindrop-md.nvim",
+  requires = {
+    "nvim-telescope/telescope.nvim",
+    "nvim-lua/plenary.nvim",
+  },
+  config = function()
+    require("raindrop-md").setup({
+      token = "your_raindrop_api_token_here",
+    })
+  end,
+}
+```
+
+## Getting Your API Token
+
+1. Go to [Raindrop.io](https://raindrop.io)
+2. Navigate to Settings → Integrations → For Developers
+3. Click "Create new app"
+4. Generate a test token
+5. Copy the token and use it in your configuration
+
+## Configuration
+
+Here's the default configuration with all available options:
+
+```lua
+require("raindrop-md").setup({
+  -- Your Raindrop.io API token (required)
+  token = nil,
+
+  -- Cache file location
+  cache_file = vim.fn.stdpath("data") .. "/raindrop-md-cache.json",
+
+  -- Cache expiration time in seconds (default: 1 hour)
+  cache_expiration = 3600,
+
+  -- Date format for display
+  date_format = "%Y-%m-%d",
+
+  -- Telescope picker options
+  telescope_opts = {
+    prompt_title = "Raindrop Bookmarks",
+    layout_strategy = "horizontal",
+    layout_config = {
+      width = 0.8,
+      height = 0.8,
+      preview_width = 0.6,
+    },
+  },
+})
+```
+
+## Usage
+
+### Commands
+
+- `:RaindropPick` - Open Telescope picker to select a bookmark
+- `:RaindropPick!` - Force refresh bookmarks from API before picking
+- `:RaindropRefresh` - Manually refresh bookmarks from Raindrop.io
+- `:RaindropClearCache` - Clear the local bookmark cache
+
+### Keymaps
+
+You can set up custom keymaps in your configuration:
+
+```lua
+-- Example keymap configuration
+vim.keymap.set("n", "<leader>rb", "<cmd>RaindropPick<cr>", { desc = "Pick Raindrop bookmark" })
+vim.keymap.set("n", "<leader>rr", "<cmd>RaindropRefresh<cr>", { desc = "Refresh Raindrop bookmarks" })
+```
+
+### Workflow
+
+1. Open a markdown file in Neovim
+2. Run `:RaindropPick` (or use your custom keymap)
+3. Search and select a bookmark from the Telescope picker
+4. The bookmark will be inserted at your cursor as `[title](url)`
+
+## How It Works
+
+1. **First Run**: The plugin fetches all your bookmarks from Raindrop.io and caches them locally
+2. **Subsequent Runs**: Bookmarks are loaded from cache for instant access
+3. **Auto-refresh**: Cache automatically refreshes after the expiration time (default: 1 hour)
+4. **Manual Refresh**: Use `:RaindropRefresh` or `:RaindropPick!` to force refresh
+
+## Features in Detail
+
+### Caching
+
+- Bookmarks are cached locally to minimize API calls
+- Default cache expiration: 1 hour (configurable)
+- Cache location: `~/.local/share/nvim/raindrop-md-cache.json`
+
+### Telescope Integration
+
+- Rich preview showing bookmark details
+- Search by title, domain, or collection
+- Shows title, domain, and collection in results
+- Preview displays: title, URL, domain, collection, excerpt, tags, and creation date
+
+### Markdown-Only
+
+The plugin intentionally only works in markdown files to prevent accidental insertions in other file types.
+
+## API
+
+You can also use the plugin programmatically:
+
+```lua
+local raindrop = require("raindrop-md")
+
+-- Setup
+raindrop.setup({ token = "your_token" })
+
+-- Pick a bookmark
+raindrop.pick_bookmark()
+
+-- Refresh bookmarks
+raindrop.refresh_bookmarks()
+
+-- Clear cache
+raindrop.clear_cache()
+```
+
+## Troubleshooting
+
+### "No API token configured" error
+
+Make sure you've set your token in the setup function:
+
+```lua
+require("raindrop-md").setup({
+  token = "your_raindrop_api_token_here",
+})
+```
+
+### "API request failed" error
+
+- Check your internet connection
+- Verify your API token is valid
+- Check if Raindrop.io API is accessible
+
+### No bookmarks found
+
+- Run `:RaindropRefresh` to force a refresh
+- Check if you have bookmarks in your Raindrop.io account
+- Clear cache with `:RaindropClearCache` and try again
+
+## Similar Projects
+
+- [browser-bookmarks.nvim](https://github.com/dhruvmanila/browser-bookmarks.nvim) - Insert browser bookmarks
+
+## License
+
+MIT
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.

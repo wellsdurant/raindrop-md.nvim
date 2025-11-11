@@ -1,0 +1,140 @@
+local pickers = require("telescope.pickers")
+local finders = require("telescope.finders")
+local conf = require("telescope.config").values
+local actions = require("telescope.actions")
+local action_state = require("telescope.actions.state")
+local previewers = require("telescope.previewers")
+local entry_display = require("telescope.pickers.entry_display")
+
+local cache = require("raindrop-md.cache")
+local config = require("raindrop-md.config")
+
+local M = {}
+
+--- Insert bookmark link at cursor position
+--- @param bookmark table
+local function insert_bookmark(bookmark)
+  local markdown_link = string.format("[%s](%s)", bookmark.title, bookmark.url)
+
+  -- Get current cursor position
+  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+
+  -- Get current line
+  local line = vim.api.nvim_get_current_line()
+
+  -- Insert link at cursor position
+  local new_line = line:sub(1, col) .. markdown_link .. line:sub(col + 1)
+  vim.api.nvim_set_current_line(new_line)
+
+  -- Move cursor to end of inserted text
+  vim.api.nvim_win_set_cursor(0, { row, col + #markdown_link })
+end
+
+--- Create entry display for telescope picker
+--- @param bookmark table
+--- @return table
+local function make_display(bookmark)
+  local displayer = entry_display.create({
+    separator = " ",
+    items = {
+      { width = 50 },
+      { width = 20 },
+      { remaining = true },
+    },
+  })
+
+  return displayer({
+    { bookmark.title, "TelescopeResultsIdentifier" },
+    { bookmark.domain, "TelescopeResultsComment" },
+    { bookmark.collection, "TelescopeResultsNumber" },
+  })
+end
+
+--- Open telescope picker for bookmarks
+--- @param opts table|nil Options for telescope picker
+function M.pick_bookmark(opts)
+  opts = opts or {}
+
+  -- Check if current buffer is a markdown file
+  local filetype = vim.bo.filetype
+  if filetype ~= "markdown" then
+    vim.notify(
+      "raindrop-md: This command only works in markdown files",
+      vim.log.levels.WARN
+    )
+    return
+  end
+
+  cache.get_bookmarks(opts.force_refresh or false, function(bookmarks)
+    if not bookmarks or #bookmarks == 0 then
+      vim.notify("raindrop-md: No bookmarks found", vim.log.levels.WARN)
+      return
+    end
+
+    local telescope_opts = vim.tbl_deep_extend("force", config.get("telescope_opts"), opts)
+
+    pickers
+      .new(telescope_opts, {
+        prompt_title = telescope_opts.prompt_title,
+        finder = finders.new_table({
+          results = bookmarks,
+          entry_maker = function(entry)
+            return {
+              value = entry,
+              display = function(e)
+                return make_display(e.value)
+              end,
+              ordinal = entry.title .. " " .. entry.domain .. " " .. entry.collection,
+            }
+          end,
+        }),
+        sorter = conf.generic_sorter(telescope_opts),
+        previewer = previewers.new_buffer_previewer({
+          title = "Bookmark Details",
+          define_preview = function(self, entry)
+            local bookmark = entry.value
+            local lines = {
+              "Title: " .. bookmark.title,
+              "URL: " .. bookmark.url,
+              "Domain: " .. bookmark.domain,
+              "Collection: " .. bookmark.collection,
+              "",
+            }
+
+            if bookmark.excerpt and bookmark.excerpt ~= "" then
+              table.insert(lines, "Excerpt:")
+              table.insert(lines, bookmark.excerpt)
+              table.insert(lines, "")
+            end
+
+            if bookmark.tags and #bookmark.tags > 0 then
+              table.insert(lines, "Tags: " .. table.concat(bookmark.tags, ", "))
+              table.insert(lines, "")
+            end
+
+            if bookmark.created then
+              local date = os.date("%Y-%m-%d %H:%M:%S", tonumber(bookmark.created))
+              table.insert(lines, "Created: " .. date)
+            end
+
+            vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
+          end,
+        }),
+        attach_mappings = function(prompt_bufnr, map)
+          actions.select_default:replace(function()
+            local selection = action_state.get_selected_entry()
+            actions.close(prompt_bufnr)
+
+            if selection then
+              insert_bookmark(selection.value)
+            end
+          end)
+
+          return true
+        end,
+      })
+      :find()
+  end)
+end
+
+return M
