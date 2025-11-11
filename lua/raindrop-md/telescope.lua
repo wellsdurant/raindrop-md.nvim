@@ -45,15 +45,18 @@ local function make_display(bookmark)
     separator = " ",
     items = {
       { width = 50 },
-      { width = 20 },
+      { width = 40 },
       { remaining = true },
     },
   })
 
+  -- Get excerpt or use empty string
+  local excerpt = bookmark.excerpt or ""
+
   return displayer({
     { bookmark.title, "TelescopeResultsIdentifier" },
-    { bookmark.domain, "TelescopeResultsComment" },
-    { bookmark.collection, "TelescopeResultsNumber" },
+    { bookmark.url, "TelescopeResultsComment" },
+    { excerpt, "TelescopeResultsNumber" },
   })
 end
 
@@ -115,7 +118,7 @@ function M.pick_bookmark(opts)
               display = function(e)
                 return make_display(e.value)
               end,
-              ordinal = entry.title .. " " .. entry.domain .. " " .. entry.collection,
+              ordinal = entry.title .. " " .. entry.url .. " " .. (entry.excerpt or ""),
             }
           end,
         }),
