@@ -103,6 +103,11 @@ function M.pick_bookmark(opts)
     return
   end
 
+  -- Capture the original window and cursor position BEFORE opening telescope
+  local original_win = vim.api.nvim_get_current_win()
+  local original_buf = vim.api.nvim_get_current_buf()
+  local original_cursor = vim.api.nvim_win_get_cursor(original_win)
+
   -- Status callback for cache updates
   local status_callback = function(status)
     if active_picker then
@@ -176,19 +181,15 @@ function M.pick_bookmark(opts)
         attach_mappings = function(prompt_bufnr, map)
           actions.select_default:replace(function()
             local selection = action_state.get_selected_entry()
-
-            -- Capture the target window/buffer info BEFORE closing telescope
-            local target_win = vim.fn.win_getid(vim.fn.winnr('#'))
-            local target_buf = vim.api.nvim_win_get_buf(target_win)
-            local cursor_pos = vim.api.nvim_win_get_cursor(target_win)
-            local row, col = cursor_pos[1], cursor_pos[2]
-
             actions.close(prompt_bufnr)
 
             if selection then
-              -- Schedule insert_bookmark to run after Telescope fully closes
+              -- Use the captured original window/buffer/cursor from before picker opened
+              -- Double schedule to ensure telescope cleanup is completely done
               vim.schedule(function()
-                insert_bookmark(selection.value, target_win, target_buf, row, col)
+                vim.schedule(function()
+                  insert_bookmark(selection.value, original_win, original_buf, original_cursor[1], original_cursor[2])
+                end)
               end)
             end
           end)
