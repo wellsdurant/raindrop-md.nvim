@@ -19,6 +19,11 @@ M.defaults = {
       preview_width = 0.6,
     },
   },
+  -- Keymaps (set to false to disable default keymaps)
+  keymaps = {
+    -- Insert mode keymap for picking bookmarks
+    insert_mode = "<C-b>",
+  },
 }
 
 M.options = {}

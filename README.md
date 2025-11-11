@@ -90,6 +90,11 @@ require("raindrop-md").setup({
       preview_width = 0.6,
     },
   },
+
+  -- Keymaps (set to false to disable default keymaps)
+  keymaps = {
+    insert_mode = "<C-b>",  -- Ctrl+b in insert mode (default)
+  },
 })
 ```
 
@@ -104,18 +109,31 @@ require("raindrop-md").setup({
 
 ### Keymaps
 
-You can set up custom keymaps in your configuration:
+**Default Keymap:**
+- `<C-b>` (Ctrl+b) in insert mode - Pick and insert a bookmark (only works in markdown files)
+
+**Customizing Keymaps:**
 
 ```lua
--- Example keymap configuration
-vim.keymap.set("n", "<leader>rb", "<cmd>RaindropPick<cr>", { desc = "Pick Raindrop bookmark" })
-vim.keymap.set("n", "<leader>rr", "<cmd>RaindropRefresh<cr>", { desc = "Refresh Raindrop bookmarks" })
+-- Customize the insert mode keymap
+require("raindrop-md").setup({
+  token = "your_token",
+  keymaps = {
+    insert_mode = "<C-k>",  -- Use Ctrl+k instead
+  },
+})
+
+-- Disable default keymaps
+require("raindrop-md").setup({
+  token = "your_token",
+  keymaps = false,  -- Disable all default keymaps
+})
 ```
 
 ### Workflow
 
 1. Open a markdown file in Neovim
-2. Run `:RaindropPick` (or use your custom keymap)
+2. Press `<C-b>` (Ctrl+b) in insert mode or run `:RaindropPick`
 3. Search and select a bookmark from the Telescope picker
 4. The bookmark will be inserted at your cursor as `[title](url)`
 

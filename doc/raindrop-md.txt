@@ -10,8 +10,9 @@ CONTENTS                                                 *raindrop-md-contents*
     2. Requirements ......................... |raindrop-md-requirements|
     3. Setup ................................ |raindrop-md-setup|
     4. Commands ............................. |raindrop-md-commands|
-    5. Configuration ........................ |raindrop-md-configuration|
-    6. API .................................. |raindrop-md-api|
+    5. Keymaps .............................. |raindrop-md-keymaps|
+    6. Configuration ........................ |raindrop-md-configuration|
+    7. API .................................. |raindrop-md-api|
 
 ==============================================================================
 INTRODUCTION                                         *raindrop-md-introduction*
@@ -70,6 +71,30 @@ COMMANDS                                                 *raindrop-md-commands*
     Clear the local bookmark cache.
 
 ==============================================================================
+KEYMAPS                                                   *raindrop-md-keymaps*
+
+Default keymap:
+    <C-b>    In insert mode, pick and insert a bookmark
+             (only works in markdown files)
+
+To customize or disable keymaps, configure in setup():
+>
+    -- Customize the insert mode keymap
+    require("raindrop-md").setup({
+      token = "your_token",
+      keymaps = {
+        insert_mode = "<C-k>",  -- Use Ctrl+k instead
+      },
+    })
+
+    -- Disable default keymaps
+    require("raindrop-md").setup({
+      token = "your_token",
+      keymaps = false,
+    })
+<
+
+==============================================================================
 CONFIGURATION                                       *raindrop-md-configuration*
 
 Default configuration:
@@ -96,6 +121,11 @@ Default configuration:
           height = 0.8,
           preview_width = 0.6,
         },
+      },
+
+      -- Keymaps (set to false to disable default keymaps)
+      keymaps = {
+        insert_mode = "<C-b>",
       },
     }
 <

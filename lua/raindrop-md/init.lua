@@ -8,6 +8,28 @@ local cache = require("raindrop-md.cache")
 --- @param opts table|nil Configuration options
 function M.setup(opts)
   config.setup(opts)
+
+  -- Set up keymaps
+  local keymaps = config.get("keymaps")
+  if keymaps and keymaps ~= false then
+    if keymaps.insert_mode then
+      vim.keymap.set("i", keymaps.insert_mode, function()
+        -- Check if current buffer is markdown
+        if vim.bo.filetype == "markdown" then
+          -- Exit insert mode, run the picker, then return to insert mode
+          vim.cmd("stopinsert")
+          M.pick_bookmark()
+        else
+          -- Return the original key if not in markdown
+          return keymaps.insert_mode
+        end
+      end, {
+        desc = "Pick Raindrop bookmark to insert",
+        expr = true,
+        noremap = true,
+      })
+    end
+  end
 end
 
 --- Pick a bookmark using Telescope
