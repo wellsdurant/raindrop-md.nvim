@@ -35,6 +35,9 @@ local function insert_bookmark(bookmark, win, buf, row, col)
     return
   end
 
+  -- Switch to the target window
+  vim.api.nvim_set_current_win(win)
+
   -- Get current line
   local line = vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1] or ""
 
@@ -53,7 +56,9 @@ local function insert_bookmark(bookmark, win, buf, row, col)
   pcall(vim.api.nvim_win_set_cursor, win, { row, new_col })
 
   -- Return to insert mode one position after the bookmark
-  vim.cmd("startinsert!")
+  vim.schedule(function()
+    vim.cmd("startinsert!")
+  end)
 end
 
 --- Create entry display for telescope picker
@@ -181,16 +186,21 @@ function M.pick_bookmark(opts)
         attach_mappings = function(prompt_bufnr, map)
           actions.select_default:replace(function()
             local selection = action_state.get_selected_entry()
-            actions.close(prompt_bufnr)
 
             if selection then
-              -- Use the captured original window/buffer/cursor from before picker opened
-              -- Double schedule to ensure telescope cleanup is completely done
-              vim.schedule(function()
-                vim.schedule(function()
-                  insert_bookmark(selection.value, original_win, original_buf, original_cursor[1], original_cursor[2])
-                end)
-              end)
+              -- Store the selection for deferred insertion
+              local bookmark_to_insert = selection.value
+
+              -- Close telescope normally
+              actions.close(prompt_bufnr)
+
+              -- Wait for telescope to fully clean up before inserting
+              -- Use timer for more reliable deferred execution
+              vim.defer_fn(function()
+                insert_bookmark(bookmark_to_insert, original_win, original_buf, original_cursor[1], original_cursor[2])
+              end, 50) -- 50ms delay
+            else
+              actions.close(prompt_bufnr)
             end
           end)
 
