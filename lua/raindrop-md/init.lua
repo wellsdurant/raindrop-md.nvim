@@ -16,17 +16,15 @@ function M.setup(opts)
       vim.keymap.set("i", keymaps.insert_mode, function()
         -- Check if current buffer is markdown
         if vim.bo.filetype == "markdown" then
-          -- Exit insert mode, run the picker, then return to insert mode
-          vim.cmd("stopinsert")
           M.pick_bookmark()
         else
-          -- Return the original key if not in markdown
-          return keymaps.insert_mode
+          -- Fallback to default behavior if not in markdown
+          local key = vim.api.nvim_replace_termcodes(keymaps.insert_mode, true, false, true)
+          vim.api.nvim_feedkeys(key, "n", false)
         end
       end, {
         desc = "Pick Raindrop bookmark to insert",
-        expr = true,
-        noremap = true,
+        noremap = false,
       })
     end
   end
