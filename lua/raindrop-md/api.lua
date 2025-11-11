@@ -5,6 +5,41 @@ local M = {}
 
 local API_BASE_URL = "https://api.raindrop.io/rest/v1"
 
+--- Get total bookmark count without fetching all data
+--- @param callback function Callback function
+function M.get_bookmark_count(callback)
+  local token = config.get("token")
+
+  if not token or token == "" then
+    callback({ error = "No API token" })
+    return
+  end
+
+  -- Fetch first page with just 1 item to get total count
+  local url = string.format("%s/raindrops/0?page=0&perpage=1", API_BASE_URL)
+
+  curl.get(url, {
+    headers = {
+      ["Authorization"] = "Bearer " .. token,
+      ["Content-Type"] = "application/json",
+    },
+    callback = vim.schedule_wrap(function(response)
+      if response.status ~= 200 then
+        callback({ error = "API request failed", status = response.status })
+        return
+      end
+
+      local ok, parsed = pcall(vim.json.decode, response.body)
+      if not ok then
+        callback({ error = "JSON parse error" })
+        return
+      end
+
+      callback({ count = parsed.count or 0 })
+    end),
+  })
+end
+
 --- Fetch a single page of bookmarks
 --- @param page number Page number
 --- @param callback function Callback function
@@ -109,7 +144,10 @@ function M.fetch_bookmarks(callback)
           string.format("raindrop-md: Completed fetching all %d bookmarks", fetched_count),
           vim.log.levels.INFO
         )
-        callback({ bookmarks = all_bookmarks })
+        callback({
+          bookmarks = all_bookmarks,
+          count = total_count
+        })
       end
     end)
   end

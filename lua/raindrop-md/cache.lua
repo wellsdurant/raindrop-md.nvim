@@ -22,14 +22,10 @@ local function is_cache_valid()
   return cache_age < expiration
 end
 
---- Read bookmarks from cache file
+--- Read cache data (includes bookmarks and metadata)
 --- @return table|nil
-function M.read()
+local function read_cache_data()
   local cache_file = config.get("cache_file")
-
-  if not is_cache_valid() then
-    return nil
-  end
 
   local file = io.open(cache_file, "r")
   if not file then
@@ -44,12 +40,28 @@ function M.read()
     return nil
   end
 
+  return data
+end
+
+--- Read bookmarks from cache file
+--- @return table|nil
+function M.read()
+  if not is_cache_valid() then
+    return nil
+  end
+
+  local data = read_cache_data()
+  if not data then
+    return nil
+  end
+
   return data.bookmarks
 end
 
 --- Write bookmarks to cache file
 --- @param bookmarks table
-function M.write(bookmarks)
+--- @param count number|nil Total count from API
+function M.write(bookmarks, count)
   local cache_file = config.get("cache_file")
 
   -- Ensure parent directory exists
@@ -58,6 +70,7 @@ function M.write(bookmarks)
 
   local data = {
     bookmarks = bookmarks,
+    count = count or #bookmarks,
     timestamp = os.time(),
   }
 
@@ -79,21 +92,10 @@ function M.clear()
   vim.notify("raindrop-md: Cache cleared", vim.log.levels.INFO)
 end
 
---- Get bookmarks (from cache or API)
---- @param force_refresh boolean Force refresh from API
+--- Fetch all bookmarks and update cache
 --- @param callback function Callback function
-function M.get_bookmarks(force_refresh, callback)
-  -- Try to read from cache first
-  if not force_refresh then
-    local cached_bookmarks = M.read()
-    if cached_bookmarks then
-      callback(cached_bookmarks)
-      return
-    end
-  end
-
-  -- Fetch from API
-  vim.notify("raindrop-md: Fetching bookmarks from Raindrop.io...", vim.log.levels.INFO)
+local function fetch_and_cache(callback)
+  vim.notify("raindrop-md: Fetching all bookmarks from Raindrop.io...", vim.log.levels.INFO)
 
   api.fetch_bookmarks(function(result)
     if result.error then
@@ -102,10 +104,10 @@ function M.get_bookmarks(force_refresh, callback)
         vim.log.levels.ERROR
       )
       -- Try to return cached data even if expired
-      local cached_bookmarks = M.read()
-      if cached_bookmarks then
+      local data = read_cache_data()
+      if data and data.bookmarks then
         vim.notify("raindrop-md: Using cached bookmarks", vim.log.levels.WARN)
-        callback(cached_bookmarks)
+        callback(data.bookmarks)
       else
         callback({})
       end
@@ -113,13 +115,69 @@ function M.get_bookmarks(force_refresh, callback)
     end
 
     local bookmarks = result.bookmarks or {}
-    M.write(bookmarks)
-    vim.notify(
-      string.format("raindrop-md: Fetched %d bookmarks", #bookmarks),
-      vim.log.levels.INFO
-    )
+    local count = result.count or #bookmarks
+    M.write(bookmarks, count)
     callback(bookmarks)
   end)
+end
+
+--- Get bookmarks (from cache or API)
+--- @param force_refresh boolean Force refresh from API
+--- @param callback function Callback function
+function M.get_bookmarks(force_refresh, callback)
+  -- If force refresh, fetch immediately
+  if force_refresh then
+    fetch_and_cache(callback)
+    return
+  end
+
+  -- Check if cache exists and is valid (not expired)
+  if is_cache_valid() then
+    local cache_data = read_cache_data()
+    if cache_data and cache_data.bookmarks then
+      local cached_count = #cache_data.bookmarks
+      local stored_count = cache_data.count or cached_count
+
+      -- Check if cache is complete by comparing with API count
+      api.get_bookmark_count(function(result)
+        if result.error then
+          -- If count check fails, use cache
+          vim.notify(
+            string.format("raindrop-md: Using cached %d bookmarks", cached_count),
+            vim.log.levels.INFO
+          )
+          callback(cache_data.bookmarks)
+          return
+        end
+
+        local api_count = result.count or 0
+
+        -- If counts match, use cache
+        if cached_count == api_count and cached_count == stored_count then
+          vim.notify(
+            string.format("raindrop-md: Using cached %d bookmarks (up to date)", cached_count),
+            vim.log.levels.INFO
+          )
+          callback(cache_data.bookmarks)
+        else
+          -- Cache is incomplete or outdated, fetch all
+          vim.notify(
+            string.format(
+              "raindrop-md: Cache incomplete (cached: %d, API: %d), fetching all...",
+              cached_count,
+              api_count
+            ),
+            vim.log.levels.INFO
+          )
+          fetch_and_cache(callback)
+        end
+      end)
+      return
+    end
+  end
+
+  -- No valid cache, fetch from API
+  fetch_and_cache(callback)
 end
 
 return M
