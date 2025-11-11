@@ -159,82 +159,6 @@ local function update_status(message)
   end
 end
 
---- Check and update cache if needed (for auto-update)
---- @param silent boolean Don't show notifications
-local function check_and_update(silent)
-  -- Check if we already have valid cache
-  local cache_data = read_cache_data()
-
-  if cache_data and cache_data.bookmarks and #cache_data.bookmarks > 0 then
-    -- We have cache, check if it needs updating
-    if is_cache_valid() then
-      local cached_count = #cache_data.bookmarks
-      local stored_count = cache_data.count or cached_count
-      local cached_last_updated = cache_data.last_updated
-
-      -- Check if cache is up to date
-      api.get_bookmark_metadata(function(result)
-        if not result.error then
-          local api_count = result.count or 0
-          local api_last_update = result.last_update
-
-          -- Update if count changed OR if there are newer modifications
-          if cached_count ~= api_count or cached_count ~= stored_count or
-             (api_last_update and cached_last_updated and api_last_update > cached_last_updated) then
-            -- Cache outdated, update incrementally
-            fetch_in_background(silent, true)
-          end
-        end
-      end)
-    else
-      -- Cache expired, update incrementally
-      fetch_in_background(silent, true)
-    end
-  else
-    -- No cache, must do full fetch
-    fetch_in_background(silent, false)
-  end
-end
-
---- Preload bookmarks silently in background
-function M.preload()
-  check_and_update(true)
-end
-
---- Auto-update cache (triggered by autocommand)
-function M.auto_update()
-  check_and_update(true)
-end
-
---- Fetch all bookmarks and update cache
---- @param callback function Callback function
-local function fetch_and_cache(callback)
-  vim.notify("raindrop-md: Fetching all bookmarks from Raindrop.io...", vim.log.levels.INFO)
-
-  api.fetch_bookmarks(function(result)
-    if result.error then
-      vim.notify(
-        "raindrop-md: Failed to fetch bookmarks: " .. (result.error or "Unknown error"),
-        vim.log.levels.ERROR
-      )
-      -- Try to return cached data even if expired
-      local data = read_cache_data()
-      if data and data.bookmarks then
-        vim.notify("raindrop-md: Using cached bookmarks", vim.log.levels.WARN)
-        callback(data.bookmarks)
-      else
-        callback({})
-      end
-      return
-    end
-
-    local bookmarks = result.bookmarks or {}
-    local count = result.count or #bookmarks
-    M.write(bookmarks, count)
-    callback(bookmarks)
-  end)
-end
-
 --- Fetch bookmarks in background (non-blocking)
 --- @param silent boolean Don't show notifications
 --- @param incremental boolean Use incremental update if possible
@@ -322,6 +246,82 @@ local function fetch_in_background(silent, incremental)
       )
     end
     update_status(string.format("Raindrop Bookmarks - Fetched %d bookmarks", #bookmarks))
+  end)
+end
+
+--- Check and update cache if needed (for auto-update)
+--- @param silent boolean Don't show notifications
+local function check_and_update(silent)
+  -- Check if we already have valid cache
+  local cache_data = read_cache_data()
+
+  if cache_data and cache_data.bookmarks and #cache_data.bookmarks > 0 then
+    -- We have cache, check if it needs updating
+    if is_cache_valid() then
+      local cached_count = #cache_data.bookmarks
+      local stored_count = cache_data.count or cached_count
+      local cached_last_updated = cache_data.last_updated
+
+      -- Check if cache is up to date
+      api.get_bookmark_metadata(function(result)
+        if not result.error then
+          local api_count = result.count or 0
+          local api_last_update = result.last_update
+
+          -- Update if count changed OR if there are newer modifications
+          if cached_count ~= api_count or cached_count ~= stored_count or
+             (api_last_update and cached_last_updated and api_last_update > cached_last_updated) then
+            -- Cache outdated, update incrementally
+            fetch_in_background(silent, true)
+          end
+        end
+      end)
+    else
+      -- Cache expired, update incrementally
+      fetch_in_background(silent, true)
+    end
+  else
+    -- No cache, must do full fetch
+    fetch_in_background(silent, false)
+  end
+end
+
+--- Preload bookmarks silently in background
+function M.preload()
+  check_and_update(true)
+end
+
+--- Auto-update cache (triggered by autocommand)
+function M.auto_update()
+  check_and_update(true)
+end
+
+--- Fetch all bookmarks and update cache
+--- @param callback function Callback function
+local function fetch_and_cache(callback)
+  vim.notify("raindrop-md: Fetching all bookmarks from Raindrop.io...", vim.log.levels.INFO)
+
+  api.fetch_bookmarks(function(result)
+    if result.error then
+      vim.notify(
+        "raindrop-md: Failed to fetch bookmarks: " .. (result.error or "Unknown error"),
+        vim.log.levels.ERROR
+      )
+      -- Try to return cached data even if expired
+      local data = read_cache_data()
+      if data and data.bookmarks then
+        vim.notify("raindrop-md: Using cached bookmarks", vim.log.levels.WARN)
+        callback(data.bookmarks)
+      else
+        callback({})
+      end
+      return
+    end
+
+    local bookmarks = result.bookmarks or {}
+    local count = result.count or #bookmarks
+    M.write(bookmarks, count)
+    callback(bookmarks)
   end)
 end
 
