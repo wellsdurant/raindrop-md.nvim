@@ -13,7 +13,6 @@ local M = {}
 
 -- Store active picker for status updates
 local active_picker = nil
-local status_timer = nil
 
 --- Insert bookmark link at cursor position
 --- @param bookmark table
@@ -50,9 +49,8 @@ local function make_display(bookmark)
     },
   })
 
-  -- Get excerpt and clean it (remove newlines, limit length)
-  local excerpt = bookmark.excerpt or ""
-  excerpt = excerpt:gsub("[\r\n]+", " "):gsub("%s+", " ")
+  -- Use pre-processed excerpt (cleaned during cache write)
+  local excerpt = bookmark.excerpt_clean or bookmark.excerpt or ""
 
   return displayer({
     { bookmark.title, "TelescopeResultsIdentifier" },
@@ -98,12 +96,8 @@ function M.pick_bookmark(opts)
       return
     end
 
-    -- Sort bookmarks by modification time (newest first)
-    table.sort(bookmarks, function(a, b)
-      local a_time = a.lastUpdate or a.created or ""
-      local b_time = b.lastUpdate or b.created or ""
-      return a_time > b_time
-    end)
+    -- Bookmarks are already pre-sorted during cache write (newest first)
+    -- No need to sort again here
 
     local telescope_opts = vim.tbl_deep_extend("force", config.get("telescope_opts"), opts)
     local base_title = telescope_opts.prompt_title
@@ -114,8 +108,8 @@ function M.pick_bookmark(opts)
         finder = finders.new_table({
           results = bookmarks,
           entry_maker = function(entry)
-            -- Clean excerpt for ordinal (remove newlines)
-            local excerpt_clean = (entry.excerpt or ""):gsub("[\r\n]+", " "):gsub("%s+", " ")
+            -- Use pre-processed excerpt (cleaned during cache write)
+            local excerpt_clean = entry.excerpt_clean or entry.excerpt or ""
 
             return {
               value = entry,

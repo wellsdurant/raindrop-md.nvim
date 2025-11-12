@@ -73,14 +73,17 @@ function M.fetch_bookmarks_since(since_timestamp, callback)
 
   local all_bookmarks = {}
   local total_count = 0
+  local most_recent_update = nil
+  local pagination_size = config.get("pagination_size") or 50
 
   -- Fetch bookmarks sorted by last update, newest first
   local function fetch_page_since(page)
     -- Sort by -lastUpdate (newest first), fetch until we hit items older than since_timestamp
     local url = string.format(
-      "%s/raindrops/0?page=%d&perpage=50&sort=-lastUpdate",
+      "%s/raindrops/0?page=%d&perpage=%d&sort=-lastUpdate",
       API_BASE_URL,
-      page
+      page,
+      pagination_size
     )
 
     curl.get(url, {
@@ -108,6 +111,11 @@ function M.fetch_bookmarks_since(since_timestamp, callback)
             -- Check if this item is newer than our since_timestamp
             local item_updated = item.lastUpdate or item.created
             if item_updated and item_updated > since_timestamp then
+              -- Track most recent update
+              if not most_recent_update or item_updated > most_recent_update then
+                most_recent_update = item_updated
+              end
+
               table.insert(all_bookmarks, {
                 id = item._id,
                 title = item.title or "Untitled",
@@ -125,7 +133,7 @@ function M.fetch_bookmarks_since(since_timestamp, callback)
         end
 
         -- Continue fetching if we found new items and there might be more
-        local fetched_count = page * 50 + (parsed.items and #parsed.items or 0)
+        local fetched_count = page * pagination_size + (parsed.items and #parsed.items or 0)
         if should_continue and fetched_count < total_count then
           fetch_page_since(page + 1)
         else
@@ -133,6 +141,7 @@ function M.fetch_bookmarks_since(since_timestamp, callback)
           callback({
             bookmarks = all_bookmarks,
             count = total_count,
+            last_updated = most_recent_update,
           })
         end
       end),
@@ -153,8 +162,8 @@ local function fetch_page(page, callback)
     return
   end
 
-  -- Use perpage=50 to minimize API calls
-  local url = string.format("%s/raindrops/0?page=%d&perpage=50", API_BASE_URL, page)
+  local pagination_size = config.get("pagination_size") or 50
+  local url = string.format("%s/raindrops/0?page=%d&perpage=%d", API_BASE_URL, page, pagination_size)
 
   curl.get(url, {
     headers = {
@@ -174,8 +183,14 @@ local function fetch_page(page, callback)
       end
 
       local bookmarks = {}
+      local most_recent_update = nil
       if parsed.items then
         for _, item in ipairs(parsed.items) do
+          local item_updated = item.lastUpdate or item.created
+          if item_updated and (not most_recent_update or item_updated > most_recent_update) then
+            most_recent_update = item_updated
+          end
+
           table.insert(bookmarks, {
             id = item._id,
             title = item.title or "Untitled",
@@ -194,6 +209,7 @@ local function fetch_page(page, callback)
         bookmarks = bookmarks,
         count = parsed.count or 0,
         page = page,
+        last_updated = most_recent_update,
       })
     end),
   })
@@ -203,6 +219,7 @@ end
 --- @param callback function Callback function to handle the response
 function M.fetch_bookmarks(callback)
   local token = config.get("token")
+  local verbose = config.get("verbose")
 
   if not token or token == "" then
     vim.notify("raindrop-md: API token not configured", vim.log.levels.ERROR)
@@ -212,6 +229,7 @@ function M.fetch_bookmarks(callback)
 
   local all_bookmarks = {}
   local total_count = 0
+  local most_recent_update = nil
 
   -- Recursive function to fetch all pages
   local function fetch_next_page(page)
@@ -229,27 +247,37 @@ function M.fetch_bookmarks(callback)
       vim.list_extend(all_bookmarks, result.bookmarks)
       total_count = result.count
 
-      -- Debug logging
+      -- Track most recent update across all pages
+      if result.last_updated and (not most_recent_update or result.last_updated > most_recent_update) then
+        most_recent_update = result.last_updated
+      end
+
+      -- Only show verbose pagination logging
       local fetched_count = #all_bookmarks
-      vim.notify(
-        string.format("raindrop-md: Fetched page %d: %d bookmarks (total: %d/%d)",
-          page, #result.bookmarks, fetched_count, total_count),
-        vim.log.levels.INFO
-      )
+      if verbose then
+        vim.notify(
+          string.format("raindrop-md: Fetched page %d: %d bookmarks (total: %d/%d)",
+            page, #result.bookmarks, fetched_count, total_count),
+          vim.log.levels.INFO
+        )
+      end
 
       -- Check if we need to fetch more pages
       if fetched_count < total_count then
         -- Fetch next page
         fetch_next_page(page + 1)
       else
-        -- All pages fetched
-        vim.notify(
-          string.format("raindrop-md: Completed fetching all %d bookmarks", fetched_count),
-          vim.log.levels.INFO
-        )
+        -- All pages fetched - only notify completion on verbose mode
+        if verbose then
+          vim.notify(
+            string.format("raindrop-md: Completed fetching all %d bookmarks", fetched_count),
+            vim.log.levels.INFO
+          )
+        end
         callback({
           bookmarks = all_bookmarks,
-          count = total_count
+          count = total_count,
+          last_updated = most_recent_update,
         })
       end
     end)

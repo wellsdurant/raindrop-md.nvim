@@ -38,7 +38,7 @@ function M.setup(opts)
     local auto_update_interval = config.get("auto_update_interval") or 300
 
     vim.api.nvim_create_augroup("RaindropMdAutoUpdate", { clear = true })
-    vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter" }, {
+    vim.api.nvim_create_autocmd({ "BufEnter" }, {
       group = "RaindropMdAutoUpdate",
       pattern = "*.md",
       callback = function()

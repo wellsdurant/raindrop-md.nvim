@@ -32,6 +32,12 @@ M.defaults = {
   auto_update = true,
   -- Minimum time between auto-updates in seconds (to avoid spam)
   auto_update_interval = 300, -- 5 minutes
+  -- Show verbose notifications (recommended: false for less noise)
+  verbose = false,
+  -- Minimum time between metadata checks in seconds (avoids checking on every picker open)
+  metadata_check_interval = 60, -- 1 minute
+  -- API pagination size (50-250, depending on Raindrop API limits)
+  pagination_size = 50,
 }
 
 M.options = {}
