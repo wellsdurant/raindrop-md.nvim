@@ -22,3 +22,16 @@ vim.api.nvim_create_user_command("RaindropClearCache", function()
 end, {
   desc = "Clear cached bookmarks",
 })
+
+-- Benchmark commands
+vim.api.nvim_create_user_command("RaindropBenchmark", function()
+  require("raindrop-md.benchmark_cmd").quick_benchmark()
+end, {
+  desc = "Run quick benchmark of raindrop-md operations",
+})
+
+vim.api.nvim_create_user_command("RaindropBenchmarkFull", function()
+  require("raindrop-md.benchmark_cmd").run_full_benchmark()
+end, {
+  desc = "Run full benchmark suite",
+})
