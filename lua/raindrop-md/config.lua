@@ -12,11 +12,18 @@ M.defaults = {
   -- Telescope picker options
   telescope_opts = {
     prompt_title = "Raindrop Bookmarks",
-    layout_strategy = "horizontal",
+    layout_strategy = "flex",
     layout_config = {
-      width = 0.8,
-      height = 0.8,
-      preview_width = 0.6,
+      width = 0.9,
+      height = 0.9,
+      preview_width = 0.5,
+      flip_columns = 120, -- Switch to vertical layout when window is narrower
+      horizontal = {
+        preview_width = 0.5,
+      },
+      vertical = {
+        preview_height = 0.5,
+      },
     },
   },
   -- Keymaps (set to false to disable default keymaps)

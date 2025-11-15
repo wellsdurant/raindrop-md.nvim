@@ -40,23 +40,8 @@ end
 --- @param bookmark table
 --- @return table
 local function make_display(bookmark)
-  local displayer = entry_display.create({
-    separator = " ",
-    items = {
-      { width = 50 },
-      { width = 40 },
-      { remaining = true },
-    },
-  })
-
-  -- Use pre-processed excerpt (cleaned during cache write)
-  local excerpt = bookmark.excerpt_clean or bookmark.excerpt or ""
-
-  return displayer({
-    { bookmark.title, "TelescopeResultsIdentifier" },
-    { bookmark.url, "TelescopeResultsComment" },
-    { excerpt, "TelescopeResultsNumber" },
-  })
+  -- Only display title, URL and excerpt remain searchable
+  return bookmark.title
 end
 
 --- Update picker prompt title with status
