@@ -125,11 +125,17 @@ function M.pick_bookmark(opts)
           title = "Bookmark Details",
           define_preview = function(self, entry)
             local bookmark = entry.value
+
+            -- Helper function to clean any string that might contain newlines
+            local function clean_line(str)
+              return str and str:gsub("[\r\n]+", " ") or ""
+            end
+
             local lines = {
-              "Title: " .. bookmark.title,
-              "URL: " .. bookmark.url,
-              "Domain: " .. bookmark.domain,
-              "Collection: " .. bookmark.collection,
+              "Title: " .. clean_line(bookmark.title),
+              "URL: " .. clean_line(bookmark.url),
+              "Domain: " .. clean_line(bookmark.domain),
+              "Collection: " .. clean_line(bookmark.collection),
               "",
             }
 
