@@ -135,7 +135,10 @@ function M.pick_bookmark(opts)
 
             if bookmark.excerpt and bookmark.excerpt ~= "" then
               table.insert(lines, "Excerpt:")
-              table.insert(lines, bookmark.excerpt)
+              -- Split excerpt by newlines since nvim_buf_set_lines expects one line per item
+              for line in bookmark.excerpt:gmatch("[^\r\n]+") do
+                table.insert(lines, line)
+              end
               table.insert(lines, "")
             end
 
