@@ -16,7 +16,6 @@ M.defaults = {
     layout_config = {
       width = 0.9,
       height = 0.9,
-      preview_width = 0.5,
       flip_columns = 120, -- Switch to vertical layout when window is narrower
       horizontal = {
         preview_width = 0.5,
