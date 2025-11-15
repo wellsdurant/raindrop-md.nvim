@@ -83,11 +83,17 @@ require("raindrop-md").setup({
   -- Telescope picker options
   telescope_opts = {
     prompt_title = "Raindrop Bookmarks",
-    layout_strategy = "horizontal",
+    layout_strategy = "flex",
     layout_config = {
-      width = 0.8,
-      height = 0.8,
-      preview_width = 0.6,
+      width = 0.9,
+      height = 0.9,
+      flip_columns = 120, -- Switch to vertical layout when window is narrower
+      horizontal = {
+        preview_width = 0.5,
+      },
+      vertical = {
+        preview_height = 0.5,
+      },
     },
   },
 
@@ -173,10 +179,10 @@ require("raindrop-md").setup({
 
 ### Telescope Integration
 
-- Rich preview showing bookmark details
-- Search by title, domain, or collection
-- Shows title, domain, and collection in results
-- Preview displays: title, URL, domain, collection, excerpt, tags, and creation date
+- Responsive flex layout that adapts to window size
+- Clean, minimal display showing bookmark titles
+- Search by title, URL, and excerpt content
+- Rich preview displays: title, URL, domain, collection, excerpt, tags, and creation date
 
 ### Markdown-Only
 
