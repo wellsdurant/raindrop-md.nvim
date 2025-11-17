@@ -152,12 +152,16 @@ function M.pick_bookmark(opts)
           local placeholder_text = "searches: title, url, excerpt"
           local extmark_id = nil
 
+          -- Get the prompt prefix length to position placeholder correctly
+          local prompt_prefix = telescope_opts.prompt_prefix or "> "
+          local prefix_length = vim.fn.strwidth(prompt_prefix)
+
           -- Function to show placeholder as virtual text
           local function show_placeholder()
             if extmark_id then
               return -- Already showing
             end
-            extmark_id = vim.api.nvim_buf_set_extmark(prompt_bufnr, ns_id, 0, 0, {
+            extmark_id = vim.api.nvim_buf_set_extmark(prompt_bufnr, ns_id, 0, prefix_length, {
               virt_text = { { placeholder_text, "Comment" } },
               virt_text_pos = "overlay",
               priority = 100,
