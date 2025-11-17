@@ -90,7 +90,6 @@ function M.pick_bookmark(opts)
     local picker = pickers
       .new(telescope_opts, {
         prompt_title = base_title,
-        default_text = "searches: title, url, excerpt",
         finder = finders.new_table({
           results = bookmarks,
           entry_maker = function(entry)
@@ -148,28 +147,53 @@ function M.pick_bookmark(opts)
           end,
         }),
         attach_mappings = function(prompt_bufnr, map)
-          -- Auto-clear placeholder text on first keypress
-          local placeholder_cleared = false
+          -- Create namespace for placeholder virtual text
+          local ns_id = vim.api.nvim_create_namespace("raindrop_placeholder")
           local placeholder_text = "searches: title, url, excerpt"
+          local extmark_id = nil
 
-          vim.api.nvim_create_autocmd("TextChangedI", {
-            buffer = prompt_bufnr,
-            callback = function()
-              if not placeholder_cleared then
-                local current_picker = action_state.get_current_picker(prompt_bufnr)
-                if current_picker then
-                  local current_text = current_picker:_get_prompt()
+          -- Function to show placeholder as virtual text
+          local function show_placeholder()
+            if extmark_id then
+              return -- Already showing
+            end
+            extmark_id = vim.api.nvim_buf_set_extmark(prompt_bufnr, ns_id, 0, 0, {
+              virt_text = { { placeholder_text, "Comment" } },
+              virt_text_pos = "overlay",
+              priority = 100,
+            })
+          end
 
-                  -- Check if user started typing (text changed from placeholder)
-                  if current_text ~= placeholder_text and current_text:find("^" .. vim.pesc(placeholder_text)) then
-                    -- User typed after placeholder, clear it and keep only new chars
-                    local new_input = current_text:sub(#placeholder_text + 1)
-                    current_picker:set_prompt(new_input)
-                    placeholder_cleared = true
-                  end
-                end
+          -- Function to hide placeholder
+          local function hide_placeholder()
+            if extmark_id then
+              vim.api.nvim_buf_del_extmark(prompt_bufnr, ns_id, extmark_id)
+              extmark_id = nil
+            end
+          end
+
+          -- Update placeholder visibility based on prompt content
+          local function update_placeholder()
+            local current_picker = action_state.get_current_picker(prompt_bufnr)
+            if current_picker then
+              local current_text = current_picker:_get_prompt()
+              if current_text == "" then
+                show_placeholder()
+              else
+                hide_placeholder()
               end
-            end,
+            end
+          end
+
+          -- Show placeholder initially
+          vim.schedule(function()
+            show_placeholder()
+          end)
+
+          -- Track text changes to show/hide placeholder
+          vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+            buffer = prompt_bufnr,
+            callback = update_placeholder,
           })
 
           actions.select_default:replace(function()
