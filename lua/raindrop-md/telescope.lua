@@ -86,10 +86,12 @@ function M.pick_bookmark(opts)
 
     local telescope_opts = vim.tbl_deep_extend("force", config.get("telescope_opts"), opts)
     local base_title = telescope_opts.prompt_title
+    -- Add reminder that search includes URL and excerpt
+    local search_hint = base_title .. " (searches title, url, excerpt)"
 
     local picker = pickers
       .new(telescope_opts, {
-        prompt_title = base_title,
+        prompt_title = search_hint,
         finder = finders.new_table({
           results = bookmarks,
           entry_maker = function(entry)
