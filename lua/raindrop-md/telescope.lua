@@ -86,15 +86,11 @@ function M.pick_bookmark(opts)
 
     local telescope_opts = vim.tbl_deep_extend("force", config.get("telescope_opts"), opts)
     local base_title = telescope_opts.prompt_title
-    -- Preserve existing prompt_prefix and add search hint
-    local original_prefix = telescope_opts.prompt_prefix or "> "
-
-    -- Override telescope_opts to include hint in prompt_prefix
-    telescope_opts.prompt_prefix = "[title|url|excerpt] " .. original_prefix
 
     local picker = pickers
       .new(telescope_opts, {
         prompt_title = base_title,
+        default_text = "searches: title, url, excerpt",
         finder = finders.new_table({
           results = bookmarks,
           entry_maker = function(entry)
@@ -152,6 +148,25 @@ function M.pick_bookmark(opts)
           end,
         }),
         attach_mappings = function(prompt_bufnr, map)
+          -- Auto-clear placeholder text on first keypress
+          local placeholder_cleared = false
+          local placeholder_text = "searches: title, url, excerpt"
+
+          vim.api.nvim_create_autocmd("InsertCharPre", {
+            buffer = prompt_bufnr,
+            callback = function()
+              if not placeholder_cleared then
+                local current_picker = action_state.get_current_picker(prompt_bufnr)
+                local current_text = current_picker:_get_prompt()
+
+                if current_text == placeholder_text then
+                  current_picker:set_prompt("")
+                  placeholder_cleared = true
+                end
+              end
+            end,
+          })
+
           actions.select_default:replace(function()
             local selection = action_state.get_selected_entry()
             actions.close(prompt_bufnr)
