@@ -86,11 +86,15 @@ function M.pick_bookmark(opts)
 
     local telescope_opts = vim.tbl_deep_extend("force", config.get("telescope_opts"), opts)
     local base_title = telescope_opts.prompt_title
+    -- Preserve existing prompt_prefix and add search hint
+    local original_prefix = telescope_opts.prompt_prefix or "> "
+
+    -- Override telescope_opts to include hint in prompt_prefix
+    telescope_opts.prompt_prefix = "[title|url|excerpt] " .. original_prefix
 
     local picker = pickers
       .new(telescope_opts, {
         prompt_title = base_title,
-        default_text = "searches: title, url, excerpt",
         finder = finders.new_table({
           results = bookmarks,
           entry_maker = function(entry)
