@@ -147,51 +147,36 @@ function M.pick_bookmark(opts)
           end,
         }),
         attach_mappings = function(prompt_bufnr, map)
-          -- Create namespace for placeholder virtual text
           local ns_id = vim.api.nvim_create_namespace("raindrop_placeholder")
-          local placeholder_text = "searches: title, url, excerpt"
-          local extmark_id = nil
+          local placeholder_hint = "searches: title, url, excerpt"
+          local original_prefix = telescope_opts.prompt_prefix or "> "
 
-          -- Function to show placeholder as virtual text
-          local function show_placeholder()
-            if extmark_id then
-              return -- Already showing
-            end
-            -- Use inline positioning so it appears after cursor without overlaying prompt prefix
-            extmark_id = vim.api.nvim_buf_set_extmark(prompt_bufnr, ns_id, 0, 0, {
-              virt_text = { { placeholder_text, "Comment" } },
-              virt_text_pos = "inline",
-              priority = 100,
-            })
-          end
+          -- Calculate window column position (after the prompt prefix)
+          local prefix_width = vim.fn.strdisplaywidth(original_prefix)
 
-          -- Function to hide placeholder
-          local function hide_placeholder()
-            if extmark_id then
-              vim.api.nvim_buf_del_extmark(prompt_bufnr, ns_id, extmark_id)
-              extmark_id = nil
-            end
-          end
-
-          -- Update placeholder visibility based on prompt content
+          -- Update placeholder based on whether input is empty
           local function update_placeholder()
             local current_picker = action_state.get_current_picker(prompt_bufnr)
             if current_picker then
               local current_text = current_picker:_get_prompt()
+              vim.api.nvim_buf_clear_namespace(prompt_bufnr, ns_id, 0, -1)
+
               if current_text == "" then
-                show_placeholder()
-              else
-                hide_placeholder()
+                -- Position hint at window column after prompt prefix
+                vim.api.nvim_buf_set_extmark(prompt_bufnr, ns_id, 0, 0, {
+                  virt_text = { { placeholder_hint, "Comment" } },
+                  virt_text_win_col = prefix_width,
+                  priority = 100,
+                })
               end
             end
           end
 
-          -- Show placeholder initially
+          -- Update initially and on text changes
           vim.schedule(function()
-            show_placeholder()
+            update_placeholder()
           end)
 
-          -- Track text changes to show/hide placeholder
           vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
             buffer = prompt_bufnr,
             callback = update_placeholder,
