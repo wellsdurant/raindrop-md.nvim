@@ -152,16 +152,21 @@ function M.pick_bookmark(opts)
           local placeholder_cleared = false
           local placeholder_text = "searches: title, url, excerpt"
 
-          vim.api.nvim_create_autocmd("InsertCharPre", {
+          vim.api.nvim_create_autocmd("TextChangedI", {
             buffer = prompt_bufnr,
             callback = function()
               if not placeholder_cleared then
                 local current_picker = action_state.get_current_picker(prompt_bufnr)
-                local current_text = current_picker:_get_prompt()
+                if current_picker then
+                  local current_text = current_picker:_get_prompt()
 
-                if current_text == placeholder_text then
-                  current_picker:set_prompt("")
-                  placeholder_cleared = true
+                  -- Check if user started typing (text changed from placeholder)
+                  if current_text ~= placeholder_text and current_text:find("^" .. vim.pesc(placeholder_text)) then
+                    -- User typed after placeholder, clear it and keep only new chars
+                    local new_input = current_text:sub(#placeholder_text + 1)
+                    current_picker:set_prompt(new_input)
+                    placeholder_cleared = true
+                  end
                 end
               end
             end,
