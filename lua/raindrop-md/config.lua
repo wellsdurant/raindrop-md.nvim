@@ -10,6 +10,9 @@ M.defaults = {
   -- Date format for display
   date_format = "%Y-%m-%d",
   -- Telescope picker options
+  -- These are merged with your global telescope defaults
+  -- Priority: telescope.defaults → these plugin defaults → runtime opts
+  -- Your global telescope config (layout_strategy, prompt_prefix, etc.) will be respected
   telescope_opts = {
     prompt_title = "Raindrop Bookmarks",
     layout_strategy = "flex",

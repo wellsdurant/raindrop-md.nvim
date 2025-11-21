@@ -84,8 +84,17 @@ function M.pick_bookmark(opts)
     -- Bookmarks are already pre-sorted during cache write (newest first)
     -- No need to sort again here
 
-    local telescope_opts = vim.tbl_deep_extend("force", config.get("telescope_opts"), opts)
-    local base_title = telescope_opts.prompt_title
+    -- Merge telescope options respecting user's global config
+    -- Priority: telescope global defaults → plugin defaults → runtime opts
+    local telescope_opts = vim.tbl_deep_extend(
+      "force",
+      conf, -- User's global telescope defaults
+      config.get("telescope_opts"), -- Plugin defaults from setup()
+      opts or {} -- Runtime opts
+    )
+
+    -- Save base title for status updates (before it gets modified)
+    local base_title = telescope_opts.prompt_title or "Raindrop Bookmarks"
 
     local picker = pickers
       .new(telescope_opts, {

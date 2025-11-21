@@ -81,6 +81,9 @@ require("raindrop-md").setup({
   date_format = "%Y-%m-%d",
 
   -- Telescope picker options
+  -- Note: These are merged with your global telescope.defaults configuration
+  -- Priority: telescope.defaults → these plugin defaults → runtime opts
+  -- Your global telescope config (prompt_prefix, sorting_strategy, etc.) will be respected
   telescope_opts = {
     prompt_title = "Raindrop Bookmarks",
     layout_strategy = "flex",
@@ -183,6 +186,32 @@ require("raindrop-md").setup({
 - Clean, minimal display showing bookmark titles
 - Search by title, URL, and excerpt content
 - Rich preview displays: title, URL, domain, collection, excerpt, tags, and creation date
+- Respects your global telescope configuration (layout, borders, colors, etc.)
+
+**Configuration Merging:**
+
+The plugin respects your global telescope settings. For example:
+
+```lua
+-- Your telescope config
+require('telescope').setup({
+  defaults = {
+    prompt_prefix = "🔍 ",
+    layout_strategy = "vertical",
+  }
+})
+
+-- Your raindrop-md config
+require('raindrop-md').setup({
+  token = "your_token",
+  telescope_opts = {
+    -- This overrides only the plugin's defaults, not your global config
+    layout_config = { width = 0.95 }
+  }
+})
+
+-- Result: Picker uses vertical layout + 🔍 prefix + 0.95 width
+```
 
 ### Markdown-Only
 
